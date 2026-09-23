@@ -1,5 +1,5 @@
 /* Sport Mimi — service worker : fonctionne hors connexion */
-const VERSION = "sport-mimi-v1";
+const VERSION = "sport-mimi-v2";
 const CORE = [
   "./",
   "./index.html",
