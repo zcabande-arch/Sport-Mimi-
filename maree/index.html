@@ -346,7 +346,8 @@ button:focus-visible,input:focus-visible,.wheel:focus-visible{outline:2px solid 
 .dial-wrap{-webkit-user-select:none;user-select:none;cursor:pointer}
 .dial-c.low{top:28%}
 .dial-ph.long{font-size:clamp(30px,8.6vw,38px)}
-.dial-today{pointer-events:auto;margin-top:6px;border:0;border-radius:999px;padding:7px 14px;background:color-mix(in srgb,var(--surface) 80%,transparent);color:var(--ink);font-weight:600;font-size:14px;cursor:pointer;box-shadow:var(--shadow)}
+.back-today{margin-left:18px;border:1.5px solid var(--ink);background:transparent;color:var(--ink);border-radius:999px;padding:11px 22px;font-weight:600;font-size:15px;cursor:pointer;animation:fade .2s}
+.dial-n b.o{color:var(--warn)}.dial-n b.r{color:var(--period)}
 .dial-hint{text-align:center;color:var(--muted);font-size:13px;margin:-4px 0 10px}
 .tri{color:#C2457E;font-size:13px}.tri.hi{color:#2F8A4E}
 .sep{font-size:10px}
@@ -532,32 +533,40 @@ function hormoneSVG({hl=null,tags=false}={}){
  return s+'</svg>'}
 function polar(cx,cy,r,deg){const a=deg*Math.PI/180;return [cx+r*Math.sin(a),cy-r*Math.cos(a)]}
 function arc(cx,cy,r,a0,a1){const [x0,y0]=polar(cx,cy,r,a0),[x1,y1]=polar(cx,cy,r,a1);return `M${x0.toFixed(2)} ${y0.toFixed(2)}A${r} ${r} 0 ${a1-a0>180?1:0} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`}
-function dialSVG(c){const cx=180,cy=180,R=146,L=c.L,step=360/L,W=34;
+function dialSVG(c,tday=null){const cx=180,cy=180,R=146,L=c.L,step=360/L,W=34;
  const ang=d=>180-(d-(c.P+1)/2)*step;
  const seg=(a,b,pad)=>arc(cx,cy,R,ang(b)-step/2+pad,ang(a)+step/2-pad);
  let s=`<svg viewBox="0 0 360 372" width="100%" aria-hidden="true"><defs><clipPath id="bowl"><circle cx="${cx}" cy="${cy}" r="${R-W/2-3}"/></clipPath></defs>`;
  s+=`<circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="var(--dial-track)" stroke-width="${W}"/>`;
- /* hormone waves inside the bowl, from cycle start (left) to today (marker) */
- const [mx,my]=polar(cx,cy,R,ang(c.day));const o=(c.ov-.5)/L,lut=o+(1-o)*.45;const tEnd=Math.min(1,(c.day+1.5)/L);
- const xL=cx-R*.92,xR=cx+R*.92,yB=cy+R,Hh=R*1.1;const X=t=>xL+(t/tEnd)*(xR-xL);
- const E=t=>.12+.7*g(t,o-.04,.055)+.3*g(t,lut,.1);let Em=0;for(let i=0;i<=60;i++)Em=Math.max(Em,E(i/60*tEnd));
- const ss=(t,a,b)=>{const x=Math.min(1,Math.max(0,(t-a)/(b-a)));return x*x*(3-2*x)};const tt=t=>t/tEnd;
- const layers=[['#A9E2E0',.9,t=>.16+.62*ss(tt(t),.82,1.02)],['#BBD7F7',.95,t=>.17+.5*ss(tt(t),.5,.98)],['#7FA6EC',.95,t=>.16+.06*tt(t)],['#8B55F0',.95,t=>.2+.07*g(tt(t),.18,.16)-.07*tt(t)],['#8FB7C9',1,t=>.1]];
- const pts=f=>{let d='';for(let i=0;i<=80;i++){const t=i/80*tEnd;d+=`${i?'L':'M'}${X(t).toFixed(1)} ${(yB-R*.2-f(t)*Hh).toFixed(1)}`}return d};
- s+=`<g clip-path="url(#bowl)">`;
- layers.forEach(([col,op,f],k)=>{const d=pts(f);s+=`<path d="${d}L${xR+40} ${yB-R*.2-f(tEnd)*Hh}L${xR+40} ${yB}L${xL-40} ${yB}L${xL-40} ${yB-R*.2-f(0)*Hh}Z" fill="${col}" opacity="${op}"/>`;if(k===1)s+=`<path id="ecurve" d="${d}" fill="none"/>`});
- s+=`</g>`;
- const lbl={men:'FSH',fol:'Œstrogène',ovu:'LH',elu:'Progestérone',llu:'Progestérone'}[c.ph];
- s+=`<text font-size="17" fill="#3D6FA8" font-family="Manrope,sans-serif" font-weight="500"><textPath href="#ecurve" startOffset="60%" dy="-6">${lbl}</textPath></text>`;
+ const [mx,my]=polar(cx,cy,R,ang(c.day));
+ /* hormone landscape: a window of ±10 days centred on the chosen day, it slides as the day changes */
+ const ov=c.ov,hw=10,base=cy+R*.84,H=R*.8,pd=(u,m)=>{const d=Math.abs(u-m)%L;return Math.min(d,L-d)},gp=(u,m,sd)=>Math.exp(-(pd(u,m)**2)/(2*sd*sd));
+ const HORM=[
+  ['Progestérone','#A9E4B8','#2F8A4E',u=>.05+.6*gp(u,ov+7,3.6),0],
+  ['Œstrogène','#A8CDF8','#3D6FA8',u=>.07+.6*gp(u,ov-1.5,2.6)+.26*gp(u,ov+7,3.4),0],
+  ['LH','#93E2DF','#23807D',u=>.04+.88*gp(u,ov,1.3),0],
+  ['FSH','#6F8FEA','#FFFFFF',u=>.06+.2*gp(u,3,3)+.34*gp(u,ov,1.2),1],
+  ['','#8B55F0','',u=>.03+.13/(1+Math.exp((pd(u,(c.P+1)/2)-c.P/2)*2.4)),0]];
+ const tAt=x=>c.day+(x-cx)/R*hw;
+ s+=`<g clip-path="url(#bowl)">`;let lab='';const placed=[];
+ HORM.forEach(([name,col,ink,f,inside])=>{let d='',best=null;
+  for(let x=cx-R-8;x<=cx+R+8;x+=4){const v=f(tAt(x)),y=base-v*H;d+=`${d?'L':'M'}${x} ${y.toFixed(1)}`;if(x>cx-R*.5&&x<cx+R*.5&&(!best||v>best[1]))best=[x,v,y]}
+  s+=`<path d="${d}L${cx+R+8} ${cy+R+10}L${cx-R-8} ${cy+R+10}Z" fill="${col}" opacity=".82"/>`;
+  if(name&&best&&best[1]>.3){const ly=Math.max(cy+4,inside?best[2]+20:best[2]-8);let lx=best[0];const half=Math.sqrt(Math.max(0,(R-W/2-3)**2-(ly-cy)**2))-name.length*4.5-6;lx=Math.max(cx-half,Math.min(cx+half,lx));
+   if(placed.some(([px,py])=>Math.abs(px-lx)<70&&Math.abs(py-ly)<17)||Math.hypot(lx-mx,ly-my)<62)return;placed.push([lx,ly]);
+   lab+=`<text x="${lx}" y="${ly.toFixed(1)}" text-anchor="middle" font-size="15" font-weight="500" fill="${ink}" font-family="Manrope,sans-serif">${name}</text>`}});
+ s+=lab+`</g>`;
  /* fertile + period arcs, with a gap ring in background colour */
  const fA=Math.max(c.P+1,c.ov-4),fB=Math.min(L,c.ov);
  [[fA,fB,'var(--dial-fert)',W],[1,c.P,'var(--dial-per)',W+10]].forEach(([a,b,col,w])=>{const d=seg(a,b,w/2/R*180/Math.PI+1);
   s+=`<path d="${d}" stroke="var(--bg)" stroke-width="${w+10}" stroke-linecap="round" fill="none"/><path d="${d}" stroke="${col}" stroke-width="${w}" stroke-linecap="round" fill="none"/>`});
- for(let d=1;d<=L;d++){const [x,y]=polar(cx,cy,R,ang(d));const on=d<=c.P||(d>=fA&&d<=fB);if(d===c.day)continue;s+=`<circle cx="${x}" cy="${y}" r="${on?3.4:2.6}" fill="${on?'#fff':'var(--dial-dot)'}"/>`}
+ for(let d=1;d<=L;d++){const [x,y]=polar(cx,cy,R,ang(d));const on=d<=c.P||(d>=fA&&d<=fB);if(d===c.day||d===tday)continue;s+=`<circle cx="${x}" cy="${y}" r="${on?3.4:2.6}" fill="${on?'#fff':'var(--dial-dot)'}"/>`}
+ /* where today is, when another day is chosen */
+ if(tday&&tday!==c.day){const [tx,ty]=polar(cx,cy,R,ang(tday));s+=`<circle cx="${tx}" cy="${ty}" r="11" fill="var(--dial-marker)" stroke="var(--bg)" stroke-width="2"/><circle cx="${tx}" cy="${ty}" r="4.5" fill="var(--muted)"/>`}
  const am=((ang(c.day)%360)+360)%360,side=(am>22&&am<108)||(am>252&&am<338);
- if(c.day<=c.P){s+=`<circle cx="${mx}" cy="${my}" r="15" fill="#6E3BDB"/>`}
- else if(side)s+=`<circle cx="${mx}" cy="${my}" r="21" fill="var(--dial-marker)" stroke="var(--bg)" stroke-width="4"/><text x="${mx}" y="${my+6.5}" text-anchor="middle" font-size="18" font-weight="600" fill="var(--ink)" font-family="Manrope,sans-serif">${c.day}</text>`;
- else s+=`<circle cx="${mx}" cy="${my}" r="37" fill="var(--dial-marker)" stroke="var(--bg)" stroke-width="4"/><text x="${mx}" y="${my-9}" text-anchor="middle" font-size="12" fill="var(--ink)" font-family="Manrope,sans-serif">Jour</text><text x="${mx}" y="${my+17}" text-anchor="middle" font-size="27" font-weight="600" fill="var(--ink)" font-family="Manrope,sans-serif">${c.day}</text>`;
+ const [mf,mi]=c.day<=c.P?['var(--dial-per)','#fff']:c.day>=fA&&c.day<=fB?['var(--dial-fert)','#fff']:['var(--dial-marker)','var(--ink)'];
+ if(side)s+=`<circle cx="${mx}" cy="${my}" r="21" fill="${mf}" stroke="var(--bg)" stroke-width="4"/><text x="${mx}" y="${my+6.5}" text-anchor="middle" font-size="18" font-weight="600" fill="${mi}" font-family="Manrope,sans-serif">${c.day}</text>`;
+ else s+=`<circle cx="${mx}" cy="${my}" r="37" fill="${mf}" stroke="var(--bg)" stroke-width="4"/><text x="${mx}" y="${my-9}" text-anchor="middle" font-size="12" fill="${mi}" font-family="Manrope,sans-serif">Jour</text><text x="${mx}" y="${my+17}" text-anchor="middle" font-size="27" font-weight="600" fill="${mi}" font-family="Manrope,sans-serif">${c.day}</text>`;
  return s+'</svg>'}
 
 /* ---------- flows ---------- */
@@ -628,10 +637,12 @@ const SC={
 let SEL=null;
 const selDate=()=>SEL?fromIso(SEL):TODAY;
 const dayWords=d=>`${JOURS[d.getDay()].toLowerCase()} ${d.getDate()} ${MOIS[d.getMonth()]}`;
-function dialHTML(d){const c=cyc(d),ph=PH[c.ph],fert=c.day>=c.ov-4&&c.day<=c.ov,n=diffDays(TODAY,d);
- const when=n===0?(c.day<=c.P?`Règles · jour ${c.day}`:`Règles dans <b>${c.next} jour${c.next>1?'s':''}</b>`):n>0?`Dans <b>${n} jour${n>1?'s':''}</b>`:`Il y a ${-n} jour${n<-1?'s':''}`;
+function dialHTML(d){const c=cyc(d),ph=PH[c.ph],fert=c.day>=c.ov-4&&c.day<=c.ov;
+ const t0=diffDays(addDays(d,-(c.day-1)),TODAY),tday=t0>=0&&t0<c.L?t0+1:null;
+ const when=c.day<=c.P?`Règles · jour ${c.day}`:`Règles dans <b class="${c.next<=2?'r':c.next<=8?'o':''}">${c.next} jour${c.next>1?'s':''}</b>`;
  const a=((180-(c.day-(c.P+1)/2)*360/c.L)%360+360)%360;
- return `${dialSVG(c)}<div class="dial-c${a<50||a>310?' low':''}"><span class="dial-date">${n===0?"Aujourd'hui · ":''}${fmtDate(d)}</span><span class="dial-ph${ph.name.length>10?' long':''}">${ph.name}</span><span class="dial-n"><span class="tri ${fert?'hi':''}">${fert?'▲':'▼'}</span> Fécondité <span class="sep">•</span> ${when}</span>${n?`<button class="dial-today" data-act="selToday">Revenir à aujourd'hui</button>`:''}</div>`}
+ return `${dialSVG(c,tday)}<div class="dial-c${a<=22||a>=338?' low':''}"><span class="dial-date">${fmtDate(d)}</span><span class="dial-ph${ph.name.length>10?' long':''}">${ph.name}</span><span class="dial-n"><span class="tri ${fert?'hi':''}">${fert?'▲':'▼'}</span> Fécondité <span class="sep">•</span> ${when}</span></div>`}
+const backBtn=()=>SEL?`<button class="back-today" data-act="selToday">Retour à aujourd'hui</button>`:'';
 function bodyCard(d){const k=iso(d),ci=S.checkins[k],c=cyc(d),ph=PH[c.ph],ins=ci?insightFor(ci,d):null,n=diffDays(TODAY,d);
  const lbl=n===0?(ci?'Modifie ton check-in':'Ajoute un nouveau symptôme'):ci?`Modifier le ${d.getDate()} ${MOIS[d.getMonth()]}`:n>0?`Prévoir le ${d.getDate()} ${MOIS[d.getMonth()]}`:`Remplir le ${d.getDate()} ${MOIS[d.getMonth()]}`;
  const upd=ci?`${n===0?'Mis à jour':(n>0?'Prévu':'Noté')+' · '+dayWords(d)} • ${ci.t||''}`:`${n===0?'':dayWords(d)+' • '}Phase ${ph.lower} • jour ${c.day}`;
@@ -644,18 +655,23 @@ function setupDial(){const w=$('.dial-wrap');if(!w)return;let drag=false,last=nu
   const c=cyc(selDate()),step=360/c.L;let deg=Math.atan2(x,-y)*180/Math.PI;deg=(deg+360)%360;
   let dd=Math.round((180-deg)/step+(c.P+1)/2);dd=((dd-1)%c.L+c.L)%c.L+1;
   return iso(addDays(selDate(),dd-c.day))};
- const go=e=>{const v=dayAt(e);if(!v||v===last)return;last=v;SEL=v===iso(TODAY)?null:v;refreshSel();if(navigator.vibrate)navigator.vibrate(4)};
- w.addEventListener('pointerdown',e=>{if(e.target.closest('button'))return;last=SEL||iso(TODAY);const v=dayAt(e);if(!v)return;drag=true;w.setPointerCapture(e.pointerId);go(e)});
- w.addEventListener('pointermove',e=>{if(drag)go(e)});
+ w.addEventListener('pointerdown',e=>{const v=dayAt(e);if(!v)return;drag=true;last=v;w.setPointerCapture(e.pointerId);glideTo(v)});
+ w.addEventListener('pointermove',e=>{if(!drag)return;const v=dayAt(e);if(!v||v===last)return;last=v;clearInterval(GLIDE);setSel(v)});
  const end=()=>{drag=false};w.addEventListener('pointerup',end);w.addEventListener('pointercancel',end);
  /* a finger on the ring turns the dial instead of scrolling the page */
  w.addEventListener('touchstart',e=>{if(e.touches.length===1&&!e.target.closest('button')&&onRing(e.touches[0]))e.preventDefault()},{passive:false});
  w.addEventListener('touchmove',e=>{if(drag)e.preventDefault()},{passive:false})}
-function refreshSel(){const d=selDate(),w=$('.dial-wrap'),b=$('.bcard');if(w)w.innerHTML=dialHTML(d);if(b)b.innerHTML=bodyCard(d)}
+let GLIDE=null;
+function setSel(v){SEL=v===iso(TODAY)?null:v;refreshSel();if(navigator.vibrate)navigator.vibrate(3)}
+/* move one day at a time so the waves and the marker visibly travel */
+function glideTo(v){clearInterval(GLIDE);let cur=selDate();const n=diffDays(cur,fromIso(v)),dir=Math.sign(n);
+ if(Math.abs(n)<=1||matchMedia('(prefers-reduced-motion: reduce)').matches)return setSel(v);
+ const ms=Math.max(14,Math.min(40,420/Math.abs(n)));GLIDE=setInterval(()=>{cur=addDays(cur,dir);setSel(iso(cur));if(iso(cur)===v)clearInterval(GLIDE)},ms)}
+function refreshSel(){const d=selDate(),w=$('.dial-wrap'),b=$('.bcard');if(w)w.innerHTML=dialHTML(d);if(b)b.innerHTML=bodyCard(d);const t=$('#bt');if(t)t.innerHTML=backBtn()}
 function todayTab(){const ci=S.checkins[iso(TODAY)];
  let met='';for(let k=0;k<7;k++){const d=addDays(TODAY,k),cc=cyc(d);let e=energyOf(cc.day,cc.L,cc.P);if(k===0&&ci)e=ci.e;
   met+=`<div class="mrow ${k?'':'t'}"><span>${k===0?"Aujourd'hui":k===1?'Demain':JOURS[d.getDay()]}</span><div class="mbar"><i style="width:${e}%;background:${eColor(e)}"></i></div>${starSVG(e,26).replace('filter:drop-shadow','--x:')}</div>`}
- return `<header class="h-top"><button class="avatar" data-act="profile" aria-label="Mon profil">${IC.user}</button></header>
+ return `<header class="h-top"><button class="avatar" data-act="profile" aria-label="Mon profil">${IC.user}</button><span id="bt">${backBtn()}</span></header>
  <section class="dial-wrap" aria-label="Cycle : touche ou fais glisser un jour">${dialHTML(selDate())}</section><p class="dial-hint">Touche ou fais glisser le cercle pour voir les autres jours</p>
  <button class="btn period" data-act="recap"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>Récap des règles</button>
  <section class="sec"><div class="sec-h"><h2>Mon corps</h2><div class="badges"><span class="badge"><span class="bi">🔥</span>${streak()}</span><span class="badge"><span class="bi">${FLOWER}</span>${points()}</span></div></div>
@@ -725,7 +741,7 @@ const ACT={
  startCheck(){S.fab=false;const k=SEL||iso(TODAY),ci=S.checkins[k];S.ciDate=k;S.sym=[...(ci?.s||[])];if(ci)S.energy=ci.e;S.flow=k===iso(TODAY)?'check':'checkDay';S.i=0;S.view='onb';render()},
  dates(){S.fab=false;S.calMonth=null;render();datesSheet()},
  recap(){const c=cyc();const start=addDays(TODAY,-(c.day-1)),nextP=addDays(TODAY,c.next),ovd=addDays(start,c.ov-1);sheet(`<h3>Récap des règles</h3><div class="plain" style="display:flex;flex-direction:column;gap:12px"><div class="row"><span>Dernières règles</span><b>${fmtShort(start)}</b></div><div class="row"><span>Durée</span><b>${S.period} jours</b></div><div class="row"><span>Ovulation estimée</span><b>${fmtShort(ovd)}</b></div><div class="row"><span>Prochaines règles</span><b>${fmtShort(nextP)}</b></div></div><div class="foot"><button class="btn" data-close-btn="1">OK</button><button class="link" id="rnew">Mes règles ont commencé aujourd'hui</button><button class="link" id="rdates">Modifier mes dates</button></div>`);$('#rnew').onclick=()=>{closeSheet();ACT.periodStart()};$('#rdates').onclick=()=>{closeSheet();ACT.dates()}},
- selToday(){SEL=null;refreshSel()},
+ selToday(){glideTo(iso(TODAY))},
  periodStart(){S.last=iso(TODAY);render();toast('Nouveau cycle commencé aujourd\'hui')},
  profile(){S.overlay='profile';render()},
  closeProfile(){S.overlay=null;render()},
