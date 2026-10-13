@@ -343,6 +343,11 @@ button:focus-visible,input:focus-visible,.wheel:focus-visible{outline:2px solid 
 .dial-ph{font-family:var(--f-body);font-weight:700;font-size:clamp(38px,11vw,48px);letter-spacing:-.02em;line-height:1.05}
 .dial-n{color:var(--muted);font-size:16px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:center}
 .dial-n b{color:var(--good);font-weight:500}
+.dial-wrap{-webkit-user-select:none;user-select:none;cursor:pointer}
+.dial-c.low{top:28%}
+.dial-ph.long{font-size:clamp(30px,8.6vw,38px)}
+.dial-today{pointer-events:auto;margin-top:6px;border:0;border-radius:999px;padding:7px 14px;background:color-mix(in srgb,var(--surface) 80%,transparent);color:var(--ink);font-weight:600;font-size:14px;cursor:pointer;box-shadow:var(--shadow)}
+.dial-hint{text-align:center;color:var(--muted);font-size:13px;margin:-4px 0 10px}
 .tri{color:#C2457E;font-size:13px}.tri.hi{color:#2F8A4E}
 .sep{font-size:10px}
 .btn.period{border-radius:16px;font-size:19px;padding:17px 34px;margin-top:4px}
@@ -534,7 +539,7 @@ function dialSVG(c){const cx=180,cy=180,R=146,L=c.L,step=360/L,W=34;
  s+=`<circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="var(--dial-track)" stroke-width="${W}"/>`;
  /* hormone waves inside the bowl, from cycle start (left) to today (marker) */
  const [mx,my]=polar(cx,cy,R,ang(c.day));const o=(c.ov-.5)/L,lut=o+(1-o)*.45;const tEnd=Math.min(1,(c.day+1.5)/L);
- const xL=cx-R*.92,xR=mx-6,yB=cy+R,Hh=R*1.1;const X=t=>xL+(t/tEnd)*(xR-xL);
+ const xL=cx-R*.92,xR=cx+R*.92,yB=cy+R,Hh=R*1.1;const X=t=>xL+(t/tEnd)*(xR-xL);
  const E=t=>.12+.7*g(t,o-.04,.055)+.3*g(t,lut,.1);let Em=0;for(let i=0;i<=60;i++)Em=Math.max(Em,E(i/60*tEnd));
  const ss=(t,a,b)=>{const x=Math.min(1,Math.max(0,(t-a)/(b-a)));return x*x*(3-2*x)};const tt=t=>t/tEnd;
  const layers=[['#A9E2E0',.9,t=>.16+.62*ss(tt(t),.82,1.02)],['#BBD7F7',.95,t=>.17+.5*ss(tt(t),.5,.98)],['#7FA6EC',.95,t=>.16+.06*tt(t)],['#8B55F0',.95,t=>.2+.07*g(tt(t),.18,.16)-.07*tt(t)],['#8FB7C9',1,t=>.1]];
@@ -549,14 +554,18 @@ function dialSVG(c){const cx=180,cy=180,R=146,L=c.L,step=360/L,W=34;
  [[fA,fB,'var(--dial-fert)',W],[1,c.P,'var(--dial-per)',W+10]].forEach(([a,b,col,w])=>{const d=seg(a,b,w/2/R*180/Math.PI+1);
   s+=`<path d="${d}" stroke="var(--bg)" stroke-width="${w+10}" stroke-linecap="round" fill="none"/><path d="${d}" stroke="${col}" stroke-width="${w}" stroke-linecap="round" fill="none"/>`});
  for(let d=1;d<=L;d++){const [x,y]=polar(cx,cy,R,ang(d));const on=d<=c.P||(d>=fA&&d<=fB);if(d===c.day)continue;s+=`<circle cx="${x}" cy="${y}" r="${on?3.4:2.6}" fill="${on?'#fff':'var(--dial-dot)'}"/>`}
+ const am=((ang(c.day)%360)+360)%360,side=(am>22&&am<108)||(am>252&&am<338);
  if(c.day<=c.P){s+=`<circle cx="${mx}" cy="${my}" r="15" fill="#6E3BDB"/>`}
+ else if(side)s+=`<circle cx="${mx}" cy="${my}" r="21" fill="var(--dial-marker)" stroke="var(--bg)" stroke-width="4"/><text x="${mx}" y="${my+6.5}" text-anchor="middle" font-size="18" font-weight="600" fill="var(--ink)" font-family="Manrope,sans-serif">${c.day}</text>`;
  else s+=`<circle cx="${mx}" cy="${my}" r="37" fill="var(--dial-marker)" stroke="var(--bg)" stroke-width="4"/><text x="${mx}" y="${my-9}" text-anchor="middle" font-size="12" fill="var(--ink)" font-family="Manrope,sans-serif">Jour</text><text x="${mx}" y="${my+17}" text-anchor="middle" font-size="27" font-weight="600" fill="var(--ink)" font-family="Manrope,sans-serif">${c.day}</text>`;
  return s+'</svg>'}
 
 /* ---------- flows ---------- */
 const FLOWS={
  onb:['welcome','mood','hard','pattern','frus','random','hormones','intro','name','age','cycle','period','last','contra','prio','notif','prep','result1','result2','checkin','symptoms','loading','insight','streak','reminders'],
- check:['checkin','symptoms','loading','insight','streak']};
+ check:['checkin','symptoms','loading','insight','streak'],
+ checkDay:['checkin','symptoms','loading','insight']};
+const ciDate=()=>S.flow==='onb'||!S.ciDate?TODAY:fromIso(S.ciDate);
 let HOOK=null,TIMER=null;
 function topBar(prog=true,right=''){const f=FLOWS[S.flow];let p='<span></span>';
  if(prog&&S.flow==='onb'){const a=f.indexOf('mood'),b=f.indexOf('prio');const pct=Math.max(5,Math.min(100,(S.i-a+1)/(b-a+1)*100));p=`<div class="prog" role="progressbar" aria-valuenow="${Math.round(pct)}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div>`}
@@ -576,7 +585,7 @@ function calPick(){const m=S.calMonth?fromIso(S.calMonth):new Date(TODAY.getFull
  for(let d=1;d<=n;d++){const dt=new Date(m.getFullYear(),m.getMonth(),d);const dis=dt>TODAY||dt<min;g+=`<button class="cd ${iso(dt)===S.last?'sel':''}" data-act="setlast" data-v="${iso(dt)}" ${dis?'disabled':''} aria-label="${d} ${MOIS[m.getMonth()]}">${d}</button>`}
  const canNext=new Date(m.getFullYear(),m.getMonth()+1,1)<=TODAY,canPrev=first>min;
  return `<div class="cal-h"><button class="icon-btn" data-act="calm" data-v="-1" ${canPrev?'':'disabled'} aria-label="Mois précédent">${IC.back}</button><strong>${MOIS[m.getMonth()]} ${m.getFullYear()}</strong><button class="icon-btn" data-act="calm" data-v="1" ${canNext?'':'disabled'} aria-label="Mois suivant" style="transform:scaleX(-1)">${IC.back}</button></div><div class="cal-g">${g}</div>`}
-function insightFor(ci){const c=cyc(),ph=PH[c.ph];const sel=SYM.filter(s=>ci.s.includes(s[0]));const hard=sel.filter(s=>s[2]==='warn'||s[2]==='pain');
+function insightFor(ci,d=TODAY){const c=cyc(d),ph=PH[c.ph];const sel=SYM.filter(s=>ci.s.includes(s[0]));const hard=sel.filter(s=>s[2]==='warn'||s[2]==='pain');
  return hard.length?{title:`${hard[0][1]} en phase ${ph.lower}`,text:ph.hard}:{title:`Une belle journée ${c.ph==='ovu'?"d'ovulation":ph.lower}`.replace('belle journée menstruelle','belle journée pendant tes règles'),text:ph.good}}
 
 const SC={
@@ -604,25 +613,53 @@ const SC={
  result1:()=>{const c=cyc(),ph=PH[c.ph];return `<div class="screen">${topBar(false)}<div class="body"><h1 class="q">${esc(S.name)}, ceci est pour toi</h1><div class="card"><h3 class="card-t">Où en es-tu aujourd'hui ?</h3>${hormoneSVG({hl:c.ph})}<div class="chips">${ph.arrows.map(([h,a])=>`<span class="hchip">${h}<span class="${a==='↗'?'up':a==='↘'?'down':'flat'}">${a}</span></span>`).join('')}</div><p class="card-p">Tu es en phase <strong>${ph.lower}</strong>, jour ${c.day} de ton cycle. ${ph.desc}</p></div><div class="dots"><i class="on"></i><i></i></div></div>${foot()}</div>`},
  result2:()=>{const ph=PH[cyc().ph];const em=l=>`<div class="emos">${l.slice(0,4).map(([e,n])=>`<span class="emo" title="${n}" aria-label="${n}">${e}</span>`).join('')}</div>`;
   return `<div class="screen">${topBar(false)}<div class="body"><h1 class="q">${esc(S.name)}, ceci est pour toi</h1><div class="card"><h3 class="card-t" style="margin-bottom:2px">Ta sélection</h3><p style="color:var(--muted);margin:0">Selon ton profil et ta phase actuelle</p><div class="sel-sec"><h4>Assiette</h4><p>${ph.food}</p>${em(ph.foods)}</div><div class="sel-sec"><h4>Mouvement</h4><p>${ph.fit}</p>${em(ph.fits)}</div><div class="sel-sec"><h4>Activités</h4><p>${ph.act}</p>${em(ph.acts)}</div></div><div class="dots"><i></i><i class="on"></i></div></div>${foot()}</div>`},
- checkin:()=>`<div class="screen">${S.flow==='onb'?`<div class="top"><span class="icon-sp"></span><span></span><button class="link" data-act="finish">Peut-être plus tard</button></div>`:topBar(false)}<div class="body center"><div class="ci-logo">${LOGO('var(--accent)',58)}</div><p class="hello">Salut ${esc(S.name)},</p><h1 class="q" style="margin-top:4px;font-family:var(--f-body);font-weight:700;letter-spacing:-.02em">Comment te sens-tu aujourd'hui ?</h1><p class="sub">Chaque check-in aide Marée à mieux te connaître.</p><div class="ci-rows"><button class="ci-row done" data-act="energy"><span class="ok">✓</span>Énergie<span class="ci-v">${eLabel(S.energy)}</span>${starSVG(S.energy,36)}</button><button class="ci-row" data-act="next"><span class="ok off">✓</span>Symptômes<span class="ci-v"></span>${IC.arrow}</button></div></div></div>`,
+ checkin:()=>`<div class="screen">${S.flow==='onb'?`<div class="top"><span class="icon-sp"></span><span></span><button class="link" data-act="finish">Peut-être plus tard</button></div>`:topBar(false)}<div class="body center"><div class="ci-logo">${LOGO('var(--accent)',58)}</div><p class="hello">Salut ${esc(S.name)},</p><h1 class="q" style="margin-top:4px;font-family:var(--f-body);font-weight:700;letter-spacing:-.02em">${(()=>{const d=ciDate(),n=diffDays(TODAY,d);return n===0?"Comment te sens-tu aujourd'hui ?":n>0?`Comment penses-tu te sentir ${dayWords(d)} ?`:`Comment te sentais-tu ${dayWords(d)} ?`})()}</h1><p class="sub">Chaque check-in aide Marée à mieux te connaître.</p><div class="ci-rows"><button class="ci-row done" data-act="energy"><span class="ok">✓</span>Énergie<span class="ci-v">${eLabel(S.energy)}</span>${starSVG(S.energy,36)}</button><button class="ci-row" data-act="next"><span class="ok off">✓</span>Symptômes<span class="ci-v"></span>${IC.arrow}</button></div></div></div>`,
  symptoms:()=>{const list=S.symMore?SYM:SYM.slice(0,14);return `<div class="screen">${topBar(false)}<div class="body"><p class="hello" style="margin:0">Check-in</p><h1 class="q" style="margin-top:2px;font-family:var(--f-body);font-weight:700;letter-spacing:-.02em">Comment va ton corps ?</h1><p class="sub">Sélectionne ce que tu ressens</p><div class="syms">${list.map(([id,l,t])=>`<button class="sym ${t} ${S.sym.includes(id)?'on':''}" data-act="sym" data-v="${id}" aria-pressed="${S.sym.includes(id)}"><span>${l}</span></button>`).join('')}</div>${S.symMore?'':`<button class="more" data-act="symmore">Voir plus +</button>`}</div>${foot('Continuer',!S.sym.length,'saveci')}</div>`},
  loading:()=>{HOOK=()=>{const bar=$('#lbar');let p=0;const step=()=>{p+=2;bar.style.width=p+'%';if(p<100)TIMER=setTimeout(step,35);else TIMER=setTimeout(next,300)};step()};
   return `<div class="screen"><div class="prep" style="align-items:center"><div class="spin">${LOGO('var(--accent)',96)}</div><div class="pbar" style="width:70%"><i id="lbar"></i></div><p style="color:var(--muted);margin:0">On relie les points…</p></div></div>`},
- insight:()=>{const ins=insightFor({s:S.sym});return `<div class="screen"><div class="ins">${starSVG(S.energy,96)}<h1>${ins.title}</h1><p>${ins.text}</p></div>${foot('Suivant')}</div>`},
+ insight:()=>{const ins=insightFor({s:S.sym},ciDate());return `<div class="screen"><div class="ins">${starSVG(S.energy,96)}<h1>${ins.title}</h1><p>${ins.text}</p></div>${foot('Suivant')}</div>`},
  streak:()=>{const n=Math.max(1,streak());const days='DLMMJVS';let w='';for(let k=0;k<7;k++){const d=addDays(TODAY,k-Math.min(n-1,6)+0);const has=S.checkins[iso(d)];w+=`<div>${days[d.getDay()]}<i class="${has?'f':''}">${has?'🔥':''}</i></div>`}
   return `<div class="screen streak"><div class="st"><div class="big">${n}</div><h2>${n>1?`${n} jours d'affilée, bravo !`:'Tu as commencé une nouvelle série.'}</h2><div class="week">${w}</div><p>Garde ta série active pour être plus en phase avec ton cycle.</p></div><div class="foot"><button class="btn" data-act="next" style="background:#1A1720;color:#fff">Continuer</button></div></div>`},
  reminders:()=>`<div class="screen">${topBar(false)}<div class="body">${Q('On te rappellera ton check-in pour en faire une habitude.','Choisis tes moments')}<div class="rem">${[['matin','Matin'],['jour','Midi'],['soir','Soir']].map(([k,l])=>`<label class="${S.rem[k].on?'on':''}" data-rem="${k}"><input type="checkbox" ${S.rem[k].on?'checked':''} data-act="remtog" data-v="${k}"><span class="cb"></span>${l}<input type="time" value="${S.rem[k].t}" data-time="${k}" aria-label="Heure ${l}"></label>`).join('')}</div></div>${foot('Continuer',false,'finish',`<button class="link" data-act="finish">Passer</button>`)}</div>`
 };
 
 /* ---------- home ---------- */
-function todayTab(){const c=cyc(),ph=PH[c.ph],ci=S.checkins[iso(TODAY)],ins=ci?insightFor(ci):null;const fert=c.day>=c.ov-4&&c.day<=c.ov;
+/* ---------- selected day on the dial (null = today) ---------- */
+let SEL=null;
+const selDate=()=>SEL?fromIso(SEL):TODAY;
+const dayWords=d=>`${JOURS[d.getDay()].toLowerCase()} ${d.getDate()} ${MOIS[d.getMonth()]}`;
+function dialHTML(d){const c=cyc(d),ph=PH[c.ph],fert=c.day>=c.ov-4&&c.day<=c.ov,n=diffDays(TODAY,d);
+ const when=n===0?(c.day<=c.P?`Règles · jour ${c.day}`:`Règles dans <b>${c.next} jour${c.next>1?'s':''}</b>`):n>0?`Dans <b>${n} jour${n>1?'s':''}</b>`:`Il y a ${-n} jour${n<-1?'s':''}`;
+ const a=((180-(c.day-(c.P+1)/2)*360/c.L)%360+360)%360;
+ return `${dialSVG(c)}<div class="dial-c${a<50||a>310?' low':''}"><span class="dial-date">${n===0?"Aujourd'hui · ":''}${fmtDate(d)}</span><span class="dial-ph${ph.name.length>10?' long':''}">${ph.name}</span><span class="dial-n"><span class="tri ${fert?'hi':''}">${fert?'▲':'▼'}</span> Fécondité <span class="sep">•</span> ${when}</span>${n?`<button class="dial-today" data-act="selToday">Revenir à aujourd'hui</button>`:''}</div>`}
+function bodyCard(d){const k=iso(d),ci=S.checkins[k],c=cyc(d),ph=PH[c.ph],ins=ci?insightFor(ci,d):null,n=diffDays(TODAY,d);
+ const lbl=n===0?(ci?'Modifie ton check-in':'Ajoute un nouveau symptôme'):ci?`Modifier le ${d.getDate()} ${MOIS[d.getMonth()]}`:n>0?`Prévoir le ${d.getDate()} ${MOIS[d.getMonth()]}`:`Remplir le ${d.getDate()} ${MOIS[d.getMonth()]}`;
+ const upd=ci?`${n===0?'Mis à jour':(n>0?'Prévu':'Noté')+' · '+dayWords(d)} • ${ci.t||''}`:`${n===0?'':dayWords(d)+' • '}Phase ${ph.lower} • jour ${c.day}`;
+ return `<button class="add-row" data-act="startCheck"><span>${lbl}</span><span class="round">${IC.arrow}</span></button><p class="upd">${upd}</p><p class="txt">${ins?ins.text:ph.desc}</p>`}
+/* Touch or drag along the ring to move through the days of the cycle */
+function setupDial(){const w=$('.dial-wrap');if(!w)return;let drag=false,last=null;
+ const local=e=>{const r=w.querySelector('svg').getBoundingClientRect(),k=360/r.width;return [(e.clientX-r.left)*k-180,(e.clientY-r.top)*k-180]};
+ const onRing=e=>{const d=Math.hypot(...local(e));return d>146-46&&d<146+46};
+ const dayAt=e=>{if(!drag&&!onRing(e))return null;const [x,y]=local(e);
+  const c=cyc(selDate()),step=360/c.L;let deg=Math.atan2(x,-y)*180/Math.PI;deg=(deg+360)%360;
+  let dd=Math.round((180-deg)/step+(c.P+1)/2);dd=((dd-1)%c.L+c.L)%c.L+1;
+  return iso(addDays(selDate(),dd-c.day))};
+ const go=e=>{const v=dayAt(e);if(!v||v===last)return;last=v;SEL=v===iso(TODAY)?null:v;refreshSel();if(navigator.vibrate)navigator.vibrate(4)};
+ w.addEventListener('pointerdown',e=>{if(e.target.closest('button'))return;last=SEL||iso(TODAY);const v=dayAt(e);if(!v)return;drag=true;w.setPointerCapture(e.pointerId);go(e)});
+ w.addEventListener('pointermove',e=>{if(drag)go(e)});
+ const end=()=>{drag=false};w.addEventListener('pointerup',end);w.addEventListener('pointercancel',end);
+ /* a finger on the ring turns the dial instead of scrolling the page */
+ w.addEventListener('touchstart',e=>{if(e.touches.length===1&&!e.target.closest('button')&&onRing(e.touches[0]))e.preventDefault()},{passive:false});
+ w.addEventListener('touchmove',e=>{if(drag)e.preventDefault()},{passive:false})}
+function refreshSel(){const d=selDate(),w=$('.dial-wrap'),b=$('.bcard');if(w)w.innerHTML=dialHTML(d);if(b)b.innerHTML=bodyCard(d)}
+function todayTab(){const ci=S.checkins[iso(TODAY)];
  let met='';for(let k=0;k<7;k++){const d=addDays(TODAY,k),cc=cyc(d);let e=energyOf(cc.day,cc.L,cc.P);if(k===0&&ci)e=ci.e;
   met+=`<div class="mrow ${k?'':'t'}"><span>${k===0?"Aujourd'hui":k===1?'Demain':JOURS[d.getDay()]}</span><div class="mbar"><i style="width:${e}%;background:${eColor(e)}"></i></div>${starSVG(e,26).replace('filter:drop-shadow','--x:')}</div>`}
  return `<header class="h-top"><button class="avatar" data-act="profile" aria-label="Mon profil">${IC.user}</button></header>
- <section class="dial-wrap">${dialSVG(c)}<div class="dial-c"><span class="dial-date">${fmtDate(TODAY)}</span><span class="dial-ph">${ph.name}</span><span class="dial-n"><span class="tri ${fert?'hi':''}">${fert?'▲':'▼'}</span> Fécondité <span class="sep">•</span> ${c.day<=c.P?`Règles · jour ${c.day}`:`Règles dans <b>${c.next} jour${c.next>1?'s':''}</b>`}</span></div></section>
+ <section class="dial-wrap" aria-label="Cycle : touche ou fais glisser un jour">${dialHTML(selDate())}</section><p class="dial-hint">Touche ou fais glisser le cercle pour voir les autres jours</p>
  <button class="btn period" data-act="recap"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>Récap des règles</button>
  <section class="sec"><div class="sec-h"><h2>Mon corps</h2><div class="badges"><span class="badge"><span class="bi">🔥</span>${streak()}</span><span class="badge"><span class="bi">${FLOWER}</span>${points()}</span></div></div>
- <div class="bcard"><button class="add-row" data-act="startCheck"><span>Ajoute un nouveau symptôme</span><span class="round">${IC.arrow}</span></button><p class="upd">${ci?`Mis à jour • ${ci.t||''}`:`Phase ${ph.lower} • jour ${c.day}`}</p><p class="txt">${ins?ins.text:ph.desc}</p></div></section>
+ <div class="bcard">${bodyCard(selDate())}</div></section>
  <section class="sec"><div class="sec-h"><h2>Ta météo énergie</h2></div><div class="meteo">${met}<p class="mnote">Estimation sur 7 jours à partir de ta phase prévue. Elle s'affine avec tes check-ins.</p></div></section>
  <section class="ask">${LOGO('#fff',40)}<h3>Demande à Marée</h3>${ASKS.map(([k,q])=>`<button class="ask-q" data-act="ask" data-v="${k}"><span>${q}</span>${IC.chev}</button>`).join('')}</section>
  <section class="partner"><svg class="deco" width="170" height="170" viewBox="0 0 48 48" fill="none" stroke="var(--accent)" stroke-width="1.2" aria-hidden="true"><circle cx="24" cy="24" r="20"/><circle cx="24" cy="24" r="13"/><circle cx="24" cy="24" r="6"/></svg><h3>Marée à deux</h3><p>Invite ton ou ta partenaire à suivre tes phases avec toi.</p><button class="btn" data-act="partner">Inviter quelqu'un</button></section>`}
@@ -655,7 +692,7 @@ function homeView(){const t={today:todayTab,cal:calTab,tips:tipsTab,explore:expl
  <nav class="nav"><div class="tabs">${tabs.map(([k,l,i])=>`<button class="tab ${S.tab===k?'on':''}" data-act="tab" data-v="${k}" aria-current="${S.tab===k?'page':'false'}">${i}${l}</button>`).join('')}</div><button class="fab ${S.fab?'open':''}" data-act="fab" aria-label="${S.fab?'Fermer':'Ajouter'}">${IC.plus}</button></nav>${S.overlay==='profile'?profileView():''}</div>`}
 
 /* ---------- render & actions ---------- */
-function render(){clearTimeout(TIMER);HOOK=null;const app=$('#app');app.innerHTML=S.view==='onb'?SC[FLOWS[S.flow][S.i]]():homeView();if(HOOK)HOOK();save()}
+function render(){clearTimeout(TIMER);HOOK=null;const app=$('#app');app.innerHTML=S.view==='onb'?SC[FLOWS[S.flow][S.i]]():homeView();if(HOOK)HOOK();setupDial();save()}
 function next(){const id=FLOWS[S.flow][S.i];if(id==='mood')S.energy=S.mood;if(S.i>=FLOWS[S.flow].length-1)return finish();S.i++;render()}
 function finish(){S.onboarded=true;S.view='home';S.flow='onb';S.fab=false;render();const m=$('#main');if(m)m.scrollTop=0}
 function toast(t){const el=document.createElement('div');el.className='toast';el.textContent=t;el.setAttribute('role','status');document.body.appendChild(el);setTimeout(()=>el.remove(),2200)}
@@ -670,24 +707,25 @@ function datesSheet(){sheet(`<h3>Modifier mes dates</h3><p class="fine">Premier 
 function shiftMonth(n){const m=S.calMonth?fromIso(S.calMonth):new Date(TODAY.getFullYear(),TODAY.getMonth(),1);S.calMonth=iso(new Date(m.getFullYear(),m.getMonth()+n,1))}
 const ACT={
  next,finish,
- back(){if(S.i<=0||(S.flow==='check'&&S.i===0)){if(S.flow==='check'){S.view='home';S.flow='onb';S.i=0;render()}return}S.i--;render()},
+ back(){if(S.i<=0||(S.flow!=='onb'&&S.i===0)){if(S.flow!=='onb'){S.view='home';S.flow='onb';S.i=0;render()}return}S.i--;render()},
  pick(b){S[b.dataset.k]=b.dataset.v;b.parentNode.querySelectorAll('.opt').forEach(o=>o.classList.toggle('on',o===b));TIMER=setTimeout(next,260)},
  tog(b){const k=b.dataset.k,v=b.dataset.v,a=S[k],i=a.indexOf(v);if(i>=0)a.splice(i,1);else{if(k==='prio'&&a.length>=3)return toast('3 choix maximum');a.push(v)}b.classList.toggle('on',i<0);$('#cta').disabled=!a.length;save()},
  sym(b){const v=b.dataset.v,i=S.sym.indexOf(v);if(i>=0)S.sym.splice(i,1);else S.sym.push(v);b.classList.toggle('on',i<0);b.setAttribute('aria-pressed',i<0);$('#cta').disabled=!S.sym.length},
  symmore(){S.symMore=true;render()},
- saveci(){const n=new Date();S.checkins[iso(TODAY)]={e:S.energy,s:[...S.sym],t:p2(n.getHours())+':'+p2(n.getMinutes())};next()},
+ saveci(){const n=new Date();S.checkins[iso(ciDate())]={e:S.energy,s:[...S.sym],t:p2(n.getHours())+':'+p2(n.getMinutes())};next()},
  setlast(b){S.last=b.dataset.v;render()},
  calm(b){shiftMonth(+b.dataset.v);render()},
  notif(b){S.notif=b.dataset.v==='1';next()},
- energy(){sheet(`<h3>Ton énergie aujourd'hui</h3><div class="star-wrap" id="est" style="height:170px"></div><div class="mood-l" id="estl" style="margin-bottom:18px"></div><input type="range" class="range" id="esl" min="0" max="100" value="${S.energy}" aria-label="Énergie"><div class="ends"><span>À plat</span><span>Au top</span></div><div class="foot"><button class="btn" data-close-btn="1">Valider</button></div>`);
+ energy(){sheet(`<h3>${diffDays(TODAY,ciDate())?'Ton énergie ce jour-là':"Ton énergie aujourd'hui"}</h3><div class="star-wrap" id="est" style="height:170px"></div><div class="mood-l" id="estl" style="margin-bottom:18px"></div><input type="range" class="range" id="esl" min="0" max="100" value="${S.energy}" aria-label="Énergie"><div class="ends"><span>À plat</span><span>Au top</span></div><div class="foot"><button class="btn" data-close-btn="1">Valider</button></div>`);
   const r=$('#esl');const up=()=>{S.energy=+r.value;$('#est').innerHTML=starSVG(S.energy,130);$('#estl').textContent=eLabel(S.energy)};r.oninput=up;up();
   const obs=new MutationObserver(()=>{if(!$('#esl')){obs.disconnect();if(S.view==='onb')render()}});obs.observe($('#sheet-root'),{childList:true})},
  remtog(b){const k=b.dataset.v;S.rem[k].on=b.checked;b.closest('label').classList.toggle('on',b.checked)},
  tab(b){S.tab=b.dataset.v;S.fab=false;render();$('#main').scrollTop=0},
  fab(b,e){if(e.target.closest('.fab-i'))return;S.fab=!S.fab;render()},
- startCheck(){S.fab=false;S.sym=[...(S.checkins[iso(TODAY)]?.s||[])];if(S.checkins[iso(TODAY)])S.energy=S.checkins[iso(TODAY)].e;S.flow='check';S.i=0;S.view='onb';render()},
+ startCheck(){S.fab=false;const k=SEL||iso(TODAY),ci=S.checkins[k];S.ciDate=k;S.sym=[...(ci?.s||[])];if(ci)S.energy=ci.e;S.flow=k===iso(TODAY)?'check':'checkDay';S.i=0;S.view='onb';render()},
  dates(){S.fab=false;S.calMonth=null;render();datesSheet()},
  recap(){const c=cyc();const start=addDays(TODAY,-(c.day-1)),nextP=addDays(TODAY,c.next),ovd=addDays(start,c.ov-1);sheet(`<h3>Récap des règles</h3><div class="plain" style="display:flex;flex-direction:column;gap:12px"><div class="row"><span>Dernières règles</span><b>${fmtShort(start)}</b></div><div class="row"><span>Durée</span><b>${S.period} jours</b></div><div class="row"><span>Ovulation estimée</span><b>${fmtShort(ovd)}</b></div><div class="row"><span>Prochaines règles</span><b>${fmtShort(nextP)}</b></div></div><div class="foot"><button class="btn" data-close-btn="1">OK</button><button class="link" id="rnew">Mes règles ont commencé aujourd'hui</button><button class="link" id="rdates">Modifier mes dates</button></div>`);$('#rnew').onclick=()=>{closeSheet();ACT.periodStart()};$('#rdates').onclick=()=>{closeSheet();ACT.dates()}},
+ selToday(){SEL=null;refreshSel()},
  periodStart(){S.last=iso(TODAY);render();toast('Nouveau cycle commencé aujourd\'hui')},
  profile(){S.overlay='profile';render()},
  closeProfile(){S.overlay=null;render()},
@@ -702,7 +740,9 @@ const ACT={
  art(b){const a=ARTS[+b.dataset.v];sheet(`<p class="fine" style="margin:0;color:var(--accent);font-weight:700;letter-spacing:.06em;text-transform:uppercase">${a[2]}</p><h3>${a[3]}</h3>${a[5].map(p=>`<p>${p}</p>`).join('')}<p class="fine">Information générale. En cas de doute, consulte un·e professionnel·le de santé.</p><div class="foot"><button class="btn" data-close-btn="1">Fermer</button></div>`)},
  day(b){const d=fromIso(b.dataset.v);if(d<fromIso(S.last)){sheet(`<h3>${d.getDate()} ${MOIS[d.getMonth()]}</h3><p>Avant ton dernier cycle enregistré.</p><div class="foot"><button class="btn" data-close-btn="1">OK</button></div>`);return}
   const c=cyc(d),ph=PH[c.ph],e=energyOf(c.day,c.L,c.P),ci=S.checkins[b.dataset.v];
-  sheet(`<h3>${JOURS[d.getDay()]} ${d.getDate()} ${MOIS[d.getMonth()]}</h3><p><b>Jour ${c.day}</b> · phase ${ph.lower}</p><p>${ph.desc}</p>${ci?`<p>Check-in : énergie ${eLabel(ci.e).toLowerCase()}, ${ci.s.map(s=>SYM.find(x=>x[0]===s)?.[1].toLowerCase()).filter(Boolean).join(', ')}.</p>`:`<p class="fine">Énergie attendue : ${eLabel(e).toLowerCase()}.</p>`}<div class="foot"><button class="btn" data-close-btn="1">OK</button></div>`)},
+  sheet(`<h3>${JOURS[d.getDay()]} ${d.getDate()} ${MOIS[d.getMonth()]}</h3><p><b>Jour ${c.day}</b> · phase ${ph.lower}</p><p>${ph.desc}</p>${ci?`<p>Check-in : énergie ${eLabel(ci.e).toLowerCase()}, ${ci.s.map(s=>SYM.find(x=>x[0]===s)?.[1].toLowerCase()).filter(Boolean).join(', ')}.</p>`:`<p class="fine">Énergie attendue : ${eLabel(e).toLowerCase()}.</p>`}<div class="foot"><button class="btn" id="dfill">${ci?'Modifier ce jour':d>TODAY?'Prévoir ce jour':'Remplir ce jour'}</button><button class="link" id="dsee">Voir sur le cercle</button></div>`);
+  const v=b.dataset.v,pick=()=>{closeSheet();SEL=v===iso(TODAY)?null:v;S.tab='today';S.fab=false};
+  $('#dfill').onclick=()=>{pick();ACT.startCheck()};$('#dsee').onclick=()=>{pick();render();const m=$('#main');if(m)m.scrollTop=0}},
  reset(b){if(!b.classList.contains('go')){b.classList.add('go');b.textContent='Confirmer : tout effacer';return}try{localStorage.removeItem('maree.v1')}catch(e){}S=Object.assign({},DEF,{rem:JSON.parse(JSON.stringify(DEF.rem)),hard:[],frus:[],prio:[],sym:[],saved:[],checkins:{}});render()}
 };
 document.getElementById('app').addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(!b||b.disabled)return;const f=ACT[b.dataset.act];if(f)f(b,e)});

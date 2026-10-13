@@ -1,5 +1,5 @@
 /* Marée — service worker : fonctionne hors connexion */
-const VERSION = "maree-v1";
+const VERSION = "maree-v2";
 const CORE = [
   "./",
   "./index.html",
