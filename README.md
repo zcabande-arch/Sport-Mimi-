@@ -14,11 +14,10 @@ Ses données restent aussi sur le téléphone. Après une modification de `maree
 
 ## Mettre l'application en ligne (une seule fois)
 
-1. Fusionner cette branche dans `main`.
-2. Sur GitHub : **Settings → Pages → Build and deployment → Source : GitHub Actions**.
-3. Le workflow `Publier sur GitHub Pages` se lance à chaque push sur `main`.
-   L'application est alors disponible à l'adresse :
-   **https://zcabande-arch.github.io/Sport-Mimi-/**
+1. Sur GitHub : **Settings → Pages**.
+2. **Source : Deploy from a branch**, branche **`claude/new-session-1k03bk`**, dossier **`/ (root)`**, puis **Save**.
+3. Une à deux minutes plus tard, l'application est disponible à l'adresse :
+   **https://zcabande-arch.github.io/Sport-Mimi-/** (et Marée sur **…/Sport-Mimi-/maree/**)
 
 ## Installer sur le téléphone
 
