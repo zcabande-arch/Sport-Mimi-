@@ -1,5 +1,5 @@
 /* Sport Mimi — service worker : fonctionne hors connexion */
-const VERSION = "sport-mimi-v2";
+const VERSION = "sport-mimi-v3";
 const CORE = [
   "./",
   "./index.html",
@@ -18,7 +18,7 @@ self.addEventListener("install", e => {
 self.addEventListener("activate", e => {
   e.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== VERSION).map(k => caches.delete(k))))
+      .then(keys => Promise.all(keys.filter(k => k.startsWith("sport-mimi-") && k !== VERSION).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
@@ -27,6 +27,8 @@ self.addEventListener("fetch", e => {
   const req = e.request;
   if (req.method !== "GET") return;
   const url = new URL(req.url);
+  // L'appli Marée (dossier maree/) a son propre service worker
+  if (url.href.startsWith(new URL("maree/", self.registration.scope).href)) return;
 
   // Pages : réseau d'abord (pour recevoir les mises à jour), cache en secours
   if (req.mode === "navigate") {

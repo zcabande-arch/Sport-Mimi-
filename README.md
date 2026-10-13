@@ -4,6 +4,14 @@ Application mobile pour tonifier les épaules en douceur, à la maison : program
 
 C'est une **PWA** (Progressive Web App) : elle s'installe sur l'écran d'accueil du téléphone comme une vraie application, s'ouvre en plein écran et **fonctionne hors connexion**.
 
+## 🌊 Marée (dossier `maree/`)
+
+Une deuxième appli dans ce dépôt : **Marée**, le suivi de cycle en douceur (phases, énergie, symptômes, check-in du jour).
+Elle s'installe et marche hors connexion de la même façon, à l'adresse :
+**https://zcabande-arch.github.io/Sport-Mimi-/maree/**
+
+Ses données restent aussi sur le téléphone. Après une modification de `maree/`, incrémenter `VERSION` dans `maree/sw.js`.
+
 ## Mettre l'application en ligne (une seule fois)
 
 1. Fusionner cette branche dans `main`.
