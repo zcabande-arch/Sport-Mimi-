@@ -345,6 +345,7 @@ button:focus-visible,input:focus-visible,.wheel:focus-visible{outline:2px solid 
 .dial-n b{color:var(--good);font-weight:500}
 .dial-wrap{-webkit-user-select:none;user-select:none;cursor:pointer}
 .dial-c.low{top:28%}
+.dial-hit{position:absolute;inset:0;z-index:1}
 .dial-ph.long{font-size:clamp(30px,8.6vw,38px)}
 .back-today{margin-left:18px;border:1.5px solid var(--ink);background:transparent;color:var(--ink);border-radius:999px;padding:11px 22px;font-weight:600;font-size:15px;cursor:pointer;animation:fade .2s}
 .dial-n b.o{color:var(--warn)}.dial-n b.r{color:var(--period)}
@@ -648,7 +649,8 @@ function bodyCard(d){const k=iso(d),ci=S.checkins[k],c=cyc(d),ph=PH[c.ph],ins=ci
  const upd=ci?`${n===0?'Mis à jour':(n>0?'Prévu':'Noté')+' · '+dayWords(d)} • ${ci.t||''}`:`${n===0?'':dayWords(d)+' • '}Phase ${ph.lower} • jour ${c.day}`;
  return `<button class="add-row" data-act="startCheck"><span>${lbl}</span><span class="round">${IC.arrow}</span></button><p class="upd">${upd}</p><p class="txt">${ins?ins.text:ph.desc}</p>`}
 /* Touch or drag along the ring to move through the days of the cycle */
-function setupDial(){const w=$('.dial-wrap');if(!w)return;let drag=false,last=null;
+let DIAL=null;
+function setupDial(){const w=$('.dial-wrap');DIAL=null;if(!w)return;let drag=false,last=null;
  const local=e=>{const r=w.querySelector('svg').getBoundingClientRect(),k=360/r.width;return [(e.clientX-r.left)*k-180,(e.clientY-r.top)*k-180]};
  const onRing=e=>{const d=Math.hypot(...local(e));return d>146-46&&d<146+46};
  const dayAt=e=>{if(!drag&&!onRing(e))return null;const [x,y]=local(e);
@@ -658,21 +660,23 @@ function setupDial(){const w=$('.dial-wrap');if(!w)return;let drag=false,last=nu
  w.addEventListener('pointerdown',e=>{const v=dayAt(e);if(!v)return;drag=true;last=v;w.setPointerCapture(e.pointerId);glideTo(v)});
  w.addEventListener('pointermove',e=>{if(!drag)return;const v=dayAt(e);if(!v||v===last)return;last=v;clearInterval(GLIDE);setSel(v)});
  const end=()=>{drag=false};w.addEventListener('pointerup',end);w.addEventListener('pointercancel',end);
- /* a finger on the ring turns the dial instead of scrolling the page */
- w.addEventListener('touchstart',e=>{if(e.touches.length===1&&!e.target.closest('button')&&onRing(e.touches[0]))e.preventDefault()},{passive:false});
- w.addEventListener('touchmove',e=>{if(drag)e.preventDefault()},{passive:false})}
+  DIAL={onRing,dragging:()=>drag}}
+/* a finger on the ring turns the dial instead of scrolling the page (.dial-hit is never redrawn,
+   so the touch keeps a live target while the dial changes under it) */
+document.addEventListener('touchstart',e=>{if(DIAL&&e.touches.length===1&&DIAL.onRing(e.touches[0]))e.preventDefault()},{passive:false});
+document.addEventListener('touchmove',e=>{if(DIAL&&DIAL.dragging())e.preventDefault()},{passive:false});
 let GLIDE=null;
 function setSel(v){SEL=v===iso(TODAY)?null:v;refreshSel();if(navigator.vibrate)navigator.vibrate(3)}
 /* move one day at a time so the waves and the marker visibly travel */
 function glideTo(v){clearInterval(GLIDE);let cur=selDate();const n=diffDays(cur,fromIso(v)),dir=Math.sign(n);
  if(Math.abs(n)<=1||matchMedia('(prefers-reduced-motion: reduce)').matches)return setSel(v);
  const ms=Math.max(14,Math.min(40,420/Math.abs(n)));GLIDE=setInterval(()=>{cur=addDays(cur,dir);setSel(iso(cur));if(iso(cur)===v)clearInterval(GLIDE)},ms)}
-function refreshSel(){const d=selDate(),w=$('.dial-wrap'),b=$('.bcard');if(w)w.innerHTML=dialHTML(d);if(b)b.innerHTML=bodyCard(d);const t=$('#bt');if(t)t.innerHTML=backBtn()}
+function refreshSel(){const d=selDate(),w=$('.dial-in'),b=$('.bcard');if(w)w.innerHTML=dialHTML(d);if(b)b.innerHTML=bodyCard(d);const t=$('#bt');if(t)t.innerHTML=backBtn()}
 function todayTab(){const ci=S.checkins[iso(TODAY)];
  let met='';for(let k=0;k<7;k++){const d=addDays(TODAY,k),cc=cyc(d);let e=energyOf(cc.day,cc.L,cc.P);if(k===0&&ci)e=ci.e;
   met+=`<div class="mrow ${k?'':'t'}"><span>${k===0?"Aujourd'hui":k===1?'Demain':JOURS[d.getDay()]}</span><div class="mbar"><i style="width:${e}%;background:${eColor(e)}"></i></div>${starSVG(e,26).replace('filter:drop-shadow','--x:')}</div>`}
  return `<header class="h-top"><button class="avatar" data-act="profile" aria-label="Mon profil">${IC.user}</button><span id="bt">${backBtn()}</span></header>
- <section class="dial-wrap" aria-label="Cycle : touche ou fais glisser un jour">${dialHTML(selDate())}</section><p class="dial-hint">Touche ou fais glisser le cercle pour voir les autres jours</p>
+ <section class="dial-wrap" aria-label="Cycle : touche ou fais glisser un jour"><div class="dial-in">${dialHTML(selDate())}</div><div class="dial-hit"></div></section><p class="dial-hint">Touche ou fais glisser le cercle pour voir les autres jours</p>
  <button class="btn period" data-act="recap"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>Récap des règles</button>
  <section class="sec"><div class="sec-h"><h2>Mon corps</h2><div class="badges"><span class="badge"><span class="bi">🔥</span>${streak()}</span><span class="badge"><span class="bi">${FLOWER}</span>${points()}</span></div></div>
  <div class="bcard">${bodyCard(selDate())}</div></section>
