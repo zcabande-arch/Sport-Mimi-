@@ -1,5 +1,5 @@
 /* Sport Mimi — service worker : fonctionne hors connexion */
-const VERSION = "sport-mimi-v3";
+const VERSION = "sport-mimi-v4";
 const CORE = [
   "./",
   "./index.html",
@@ -29,6 +29,8 @@ self.addEventListener("fetch", e => {
   const url = new URL(req.url);
   // L'appli Marée (dossier maree/) a son propre service worker
   if (url.href.startsWith(new URL("maree/", self.registration.scope).href)) return;
+  // L'appli Maison Reconnue (dossier maison/) aussi
+  if (url.href.startsWith(new URL("maison/", self.registration.scope).href)) return;
 
   // Pages : réseau d'abord (pour recevoir les mises à jour), cache en secours
   if (req.mode === "navigate") {

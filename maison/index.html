@@ -1,0 +1,632 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Maison Reconnue</title>
+<meta name="description" content="Un visage, et toute la salle de bain se règle pour vous : reconnaissance par caméra avec un modèle Teachable Machine.">
+<meta name="theme-color" content="#eef2f1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f1514" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Maison">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="icon" href="icons/icon-192.png" type="image/png" sizes="192x192">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: scan panel on top (live camera + recognition), then a grid of equipment cards driven by the recognised profile */
+:root{
+  --bg:#eef2f1; --surface:#ffffff; --sunk:#e3e9e8; --line:#cfd8d6;
+  --fg:#16211f; --muted:#5b6b68;
+  --accent:#0f7a6c; --accent-soft:#d5ece8;
+  --cold:#2f7fd1; --hot:#d9502b; --ok:#2b8a4a; --warn:#c48410;
+  --display:"Bricolage Grotesque",system-ui,sans-serif;
+  --body:"IBM Plex Sans",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f1514; --surface:#18201f; --sunk:#111816; --line:#2a3634;
+  --fg:#e6eeec; --muted:#93a3a0; --accent:#3fc2ae; --accent-soft:#163631;
+  --cold:#5aa2ee; --hot:#f0744f; --ok:#4fbf72; --warn:#e3a93a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1514; --surface:#18201f; --sunk:#111816; --line:#2a3634;
+  --fg:#e6eeec; --muted:#93a3a0; --accent:#3fc2ae; --accent-soft:#163631;
+  --cold:#5aa2ee; --hot:#f0744f; --ok:#4fbf72; --warn:#e3a93a; color-scheme:dark}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-top:max(20px,env(safe-area-inset-top,0px));padding-bottom:max(40px,env(safe-area-inset-bottom,0px))}
+.wrap{max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+h1,h2,h3{font-family:var(--display);margin:0;text-wrap:balance}
+h1{font-size:clamp(1.6rem,4vw,2.3rem);letter-spacing:-.02em}
+.sub{color:var(--muted);margin:4px 0 0}
+.label{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+header{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.clock{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--muted)}
+
+/* scan */
+.scan{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;display:grid;grid-template-columns:220px 1fr;gap:22px;align-items:start}
+@media (max-width:640px){.scan{grid-template-columns:1fr;justify-items:center;text-align:center}}
+.cam{width:220px;max-width:100%;aspect-ratio:1;border-radius:50%;background:var(--sunk);position:relative;overflow:hidden;border:3px solid var(--line);display:grid;place-items:center;transition:border-color .3s}
+.cam svg{width:62%;height:62%;color:var(--muted);transition:color .3s,opacity .3s}
+.cam.found{border-color:var(--accent)} .cam.found svg{color:var(--accent)}
+.cam video,.cam canvas.still,.cam img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.cam video,.cam canvas.still{transform:scaleX(-1)}
+.cam.live svg,.cam.has-img svg{opacity:0}
+.beam{position:absolute;left:0;right:0;height:3px;background:var(--accent);box-shadow:0 0 14px var(--accent);top:-5%;opacity:0;z-index:2}
+.cam.scanning .beam{opacity:1;animation:sweep 1.1s ease-in-out infinite alternate}
+@keyframes sweep{to{top:100%}}
+.corner{position:absolute;width:22px;height:22px;border:3px solid var(--accent);opacity:0;transition:opacity .3s;z-index:2}
+.cam.scanning .corner,.cam.found .corner{opacity:1}
+.c1{top:18%;left:18%;border-right:0;border-bottom:0}.c2{top:18%;right:18%;border-left:0;border-bottom:0}
+.c3{bottom:18%;left:18%;border-right:0;border-top:0}.c4{bottom:18%;right:18%;border-left:0;border-top:0}
+.ring{position:absolute;inset:-3px;border-radius:50%;pointer-events:none;z-index:3;
+  background:conic-gradient(var(--accent) calc(var(--p,0)*1turn),transparent 0);
+  -webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 6px),#000 calc(100% - 5px));
+          mask:radial-gradient(farthest-side,transparent calc(100% - 6px),#000 calc(100% - 5px))}
+.who{display:flex;flex-direction:column;gap:12px;min-width:0;width:100%}
+.who h2{font-size:1.6rem}
+.status{font-family:var(--mono);font-size:13px}
+.status.err{color:var(--hot)}
+button{font:inherit;cursor:pointer}
+.primary{background:var(--accent);color:var(--surface);border:0;border-radius:10px;padding:11px 18px;font-weight:600}
+.primary:disabled{opacity:.5;cursor:wait}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btns{display:flex;gap:8px;flex-wrap:wrap}
+@media (max-width:640px){.btns{justify-content:center}}
+label.act,label.primary{cursor:pointer;display:inline-block}
+.vh{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;pointer-events:none}
+
+.probs{display:flex;flex-direction:column;gap:6px;width:100%}
+.prob{display:grid;grid-template-columns:100px 1fr 44px;gap:8px;align-items:center;font-family:var(--mono);font-size:12px;text-align:left}
+.prob .bar{background:var(--sunk);border-radius:4px;overflow:hidden;height:8px}
+.prob b{display:block;height:100%;border-radius:4px;background:var(--muted);transition:width .2s}
+.prob.top b{background:var(--accent)}
+.prob span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prob span:last-child{text-align:right;font-variant-numeric:tabular-nums}
+
+details.setup{border-top:1px solid var(--line);padding-top:10px;text-align:left;width:100%}
+details.setup summary{cursor:pointer;font-weight:600;font-size:14px}
+.setup-body{display:flex;flex-direction:column;gap:12px;margin-top:12px}
+.maprow{display:grid;grid-template-columns:minmax(70px,auto) 1fr 1fr auto;gap:6px;align-items:center}
+@media (max-width:480px){.maprow{grid-template-columns:1fr 1fr}.maprow .val{grid-column:1/-1}}
+.maprow .val{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kid{display:flex;align-items:center;gap:4px;font-size:12px;color:var(--muted);white-space:nowrap}
+select,input[type=text]{font:inherit;font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--sunk);color:var(--fg);min-width:0;width:100%}
+
+/* devices */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+@media (max-width:360px){.grid{grid-template-columns:1fr}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.card-h{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.card h3{font-size:1.1rem;display:flex;align-items:center;gap:8px}
+.card h3 svg{width:20px;height:20px;color:var(--accent);flex:none}
+.pill{font-family:var(--mono);font-size:11px;padding:3px 8px;border-radius:999px;background:var(--sunk);color:var(--muted);white-space:nowrap}
+.pill.on{background:var(--accent-soft);color:var(--accent)}
+.big{font-family:var(--display);font-size:2.6rem;font-weight:700;font-variant-numeric:tabular-nums;line-height:1}
+.big small{font-size:1rem;color:var(--muted);font-weight:500}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.row span:first-child{color:var(--muted);font-size:14px}
+.val{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:13px}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.therm{height:8px;border-radius:4px;background:linear-gradient(90deg,var(--cold),var(--hot));position:relative}
+.therm i{position:absolute;top:-4px;width:4px;height:16px;border-radius:2px;background:var(--fg);transform:translateX(-50%)}
+.switch{width:44px;height:26px;border-radius:13px;border:0;background:var(--line);position:relative;flex:none}
+.switch::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:var(--surface);transition:left .2s}
+.switch[aria-checked="true"]{background:var(--accent)}
+.switch[aria-checked="true"]::after{left:21px}
+.seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{flex:1;border:0;background:transparent;color:var(--muted);padding:6px 8px;font-size:12px}
+.seg button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.act{border:1px solid var(--line);background:var(--sunk);color:var(--fg);border-radius:8px;padding:8px 12px;font-size:13px}
+.warn{color:var(--warn);font-size:13px}
+.saved{font-size:12px;color:var(--muted);font-family:var(--mono)}
+
+/* log */
+.log{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px}
+.log-h{display:flex;justify-content:space-between;align-items:center}
+.log-h button{border:0;background:none;color:var(--muted);font-size:12px;text-decoration:underline}
+.log ol{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:6px;max-height:220px;overflow:auto}
+.log li{font-family:var(--mono);font-size:12.5px;display:flex;gap:10px}
+.log time{color:var(--muted);flex:none}
+.note{font-size:12.5px;color:var(--muted);max-width:70ch}
+@media (prefers-reduced-motion:reduce){.cam.scanning .beam{animation:none;top:50%}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Maison Reconnue</h1>
+      <p class="sub">Un visage, et toute la salle de bain se règle pour vous.</p>
+    </div>
+    <div class="clock" id="clock">--:--</div>
+  </header>
+
+  <section class="scan" aria-label="Reconnaissance faciale">
+    <div class="cam" id="cam">
+      <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><ellipse cx="32" cy="30" rx="17" ry="21"/><circle cx="25" cy="27" r="2" fill="currentColor"/><circle cx="39" cy="27" r="2" fill="currentColor"/><path d="M32 30v7h-3"/><path d="M26 43c3 2.5 9 2.5 12 0"/></svg>
+      <video id="video" playsinline muted autoplay hidden></video>
+      <canvas id="still" class="still" width="224" height="224" hidden></canvas>
+      <img id="camImg" alt="Photo analysée" hidden>
+      <div class="beam"></div>
+      <span class="corner c1"></span><span class="corner c2"></span><span class="corner c3"></span><span class="corner c4"></span>
+      <div class="ring" id="ring"></div>
+    </div>
+    <div class="who">
+      <span class="label">Caméra miroir · salle de bain</span>
+      <h2 id="whoName">Bonjour</h2>
+      <div class="status" id="status">Chargement du modèle de reconnaissance…</div>
+      <div class="btns">
+        <button class="primary" id="camBtn" disabled>Activer la caméra</button>
+        <label class="act" for="photo" id="photoBtn" hidden>Analyser une photo</label>
+        <input type="file" id="photo" accept="image/*" capture="user" class="vh">
+      </div>
+      <div id="probs" class="probs" aria-live="off"></div>
+
+      <details class="setup" id="setup">
+        <summary>Personnes du modèle</summary>
+        <div class="setup-body">
+          <div class="status" id="tmStatus">—</div>
+          <div class="note">Associe chaque classe de ton modèle Teachable Machine à une personne (avec son prénom), à « Invité » ou à « Pièce vide ». Les réglages que tu changes pendant que quelqu'un est reconnu sont mémorisés pour cette personne.</div>
+          <div id="mapRows" style="display:flex;flex-direction:column;gap:8px"></div>
+          <div>
+            <div class="row"><span>Confiance minimale</span><span class="val" id="thrV"></span></div>
+            <input type="range" id="thrR" min="50" max="99" aria-label="Confiance minimale">
+          </div>
+          <div class="btns">
+            <label class="act" for="tmFiles">Charger un autre modèle (3 fichiers)</label>
+            <input type="file" id="tmFiles" multiple accept=".json,.bin,application/json,application/octet-stream" class="vh">
+            <button class="act" id="reloadModel">Recharger le modèle en ligne</button>
+          </div>
+        </div>
+      </details>
+    </div>
+  </section>
+
+  <section class="grid" id="grid">
+    <!-- Douche -->
+    <article class="card">
+      <div class="card-h"><h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20V8a4 4 0 0 1 8 0"/><path d="M9 8h6"/><path d="M11 12v1M14 12v1M17 12v1M12 16v1M15 16v1M18 16v1"/></svg>Douche</h3><span class="pill" id="showerPill">Arrêt</span></div>
+      <div class="big"><span id="showerT">38,0</span><small> °C</small></div>
+      <div class="therm"><i id="showerMark"></i></div>
+      <input type="range" id="showerR" min="30" max="45" step="0.5" aria-label="Température de la douche">
+      <div class="row"><span>Débit</span><div class="seg" id="flow"><button data-v="Éco">Éco</button><button data-v="Normal">Normal</button><button data-v="Pluie">Pluie</button></div></div>
+      <div class="row"><span>Durée max</span><span class="val" id="durV"></span></div>
+      <input type="range" id="durR" min="3" max="20" aria-label="Durée maximale">
+      <div class="warn" id="showerWarn" hidden></div>
+      <button class="act" id="showerBtn">Lancer la douche</button>
+      <div class="saved" id="showerTimer" hidden></div>
+    </article>
+
+    <!-- Toilettes -->
+    <article class="card">
+      <div class="card-h"><h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 3h6v7H6z"/><path d="M4 10h16a6 6 0 0 1-6 6h-4a6 6 0 0 1-6-6z"/><path d="M9 16l-1 5h8l-1-5"/></svg>Cuvette japonaise</h3><span class="pill" id="lidPill">Abattant fermé</span></div>
+      <div class="row"><span>Siège chauffant</span><span class="val" id="seatV"></span></div>
+      <input type="range" id="seatR" min="25" max="40" aria-label="Température du siège">
+      <div class="row"><span>Eau du lavage</span><span class="val" id="bidetV"></span></div>
+      <input type="range" id="bidetR" min="28" max="40" aria-label="Température de l'eau du lavage">
+      <div class="row"><span>Pression du jet</span><div class="seg" id="jet"><button data-v="Douce">Douce</button><button data-v="Moyenne">Moy.</button><button data-v="Forte">Forte</button></div></div>
+      <div class="row"><span>Ouverture auto de l'abattant</span><button class="switch" role="switch" id="lidAuto" aria-label="Ouverture automatique"></button></div>
+      <div class="row"><span>Désodorisant</span><button class="switch" role="switch" id="deo" aria-label="Désodorisant"></button></div>
+      <div class="row"><span>Veilleuse</span><button class="switch" role="switch" id="night" aria-label="Veilleuse"></button></div>
+      <button class="act" id="flushBtn">Chasse d'eau</button>
+    </article>
+
+    <!-- Lavabo & miroir -->
+    <article class="card">
+      <div class="card-h"><h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="3" width="14" height="10" rx="5"/><path d="M3 16h18M7 16v5h10v-5"/></svg>Lavabo &amp; miroir</h3><span class="pill on">Prêt</span></div>
+      <div class="row"><span>Eau du robinet</span><span class="val" id="tapV"></span></div>
+      <input type="range" id="tapR" min="15" max="45" aria-label="Température du robinet">
+      <div class="row"><span>Anti-buée miroir</span><button class="switch" role="switch" id="defog" aria-label="Anti-buée"></button></div>
+      <div class="row"><span>Météo &amp; agenda sur le miroir</span><button class="switch" role="switch" id="mirrorInfo" aria-label="Affichage miroir"></button></div>
+    </article>
+
+    <!-- Ambiance -->
+    <article class="card">
+      <div class="card-h"><h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.5 1 2.5h6c0-1 .3-1.8 1-2.5A6 6 0 0 0 12 3z"/></svg>Ambiance</h3><span class="pill on" id="lightPill"></span></div>
+      <div class="row"><span>Luminosité</span><span class="val" id="lumV"></span></div>
+      <input type="range" id="lumR" min="0" max="100" aria-label="Luminosité">
+      <div class="row"><span>Teinte</span><div class="seg" id="tint"><button data-v="Chaude">Chaude</button><button data-v="Neutre">Neutre</button><button data-v="Froide">Froide</button></div></div>
+      <div class="row"><span>Musique</span><span class="val" id="musicV"></span></div>
+    </article>
+
+    <!-- Chauffage -->
+    <article class="card">
+      <div class="card-h"><h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 14.8V4a2 2 0 1 0-4 0v10.8a4 4 0 1 0 4 0z"/></svg>Chauffage</h3><span class="pill on" id="heatPill"></span></div>
+      <div class="row"><span>Pièce</span><span class="val" id="roomV"></span></div>
+      <input type="range" id="roomR" min="17" max="26" step="0.5" aria-label="Température de la pièce">
+      <div class="row"><span>Sèche-serviettes</span><button class="switch" role="switch" id="towel" aria-label="Sèche-serviettes"></button></div>
+      <div class="row"><span>Sol chauffant</span><button class="switch" role="switch" id="floor" aria-label="Sol chauffant"></button></div>
+      <div class="row"><span>VMC (aération)</span><div class="seg" id="vmc"><button data-v="Lente">Lente</button><button data-v="Auto">Auto</button><button data-v="Boost">Boost</button></div></div>
+    </article>
+
+    <!-- Baignoire -->
+    <article class="card">
+      <div class="card-h"><h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12h18v2a5 5 0 0 1-5 5H8a5 5 0 0 1-5-5z"/><path d="M6 12V6a2 2 0 0 1 4 0M7 19l-1 2M17 19l1 2"/></svg>Baignoire</h3><span class="pill" id="bathPill">Vide</span></div>
+      <div class="row"><span>Température du bain</span><span class="val" id="bathV"></span></div>
+      <input type="range" id="bathR" min="30" max="42" step="0.5" aria-label="Température du bain">
+      <div class="row"><span>Niveau</span><div class="seg" id="level"><button data-v="1/2">1/2</button><button data-v="2/3">2/3</button><button data-v="Plein">Plein</button></div></div>
+      <button class="act" id="bathBtn">Remplir le bain</button>
+    </article>
+  </section>
+
+  <section class="log">
+    <div class="log-h"><span class="label">Journal de la maison</span><button id="clearLog">Effacer</button></div>
+    <ol id="log"></ol>
+  </section>
+
+  <p class="note">La reconnaissance se fait entièrement sur ton téléphone avec ton modèle Teachable Machine : aucune image n'est envoyée sur internet. Les équipements sont simulés ; pour piloter une vraie salle de bain, il faut relier cette appli à des appareils connectés (mitigeur thermostatique, WC lavant, éclairage, thermostat) via une box domotique comme Home Assistant.</p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8.5/dist/teachablemachine-image.min.js"></script>
+<script>
+/* ---------- Modèle Teachable Machine ---------- */
+const MODEL_URL = "https://teachablemachine.withgoogle.com/models/PGEUfeFRV/";
+const STREAK = 6;          // nombre d'images d'affilée au-dessus du seuil avant de valider
+const GUEST_AFTER = 4500;  // ms de visage incertain avant de passer en profil invité
+const FPS = 6;
+
+/* ---------- Réglages ---------- */
+const KEYS = ["shower","flow","dur","seat","bidet","jet","lidAuto","deo","night","tap","defog","mirrorInfo","lum","tint","music","room","towel","floor","vmc","bath","level"];
+const PRESETS = [
+  {shower:39, flow:"Pluie",  dur:10, seat:36, bidet:37, jet:"Moyenne", lidAuto:true, deo:true,  night:false, tap:38, defog:true, mirrorInfo:true,  lum:85, tint:"Froide", room:22.5, towel:true, floor:true, vmc:"Auto",  bath:38,   level:"2/3"},
+  {shower:41, flow:"Normal", dur:15, seat:38, bidet:38, jet:"Moyenne", lidAuto:true, deo:true,  night:true,  tap:40, defog:true, mirrorInfo:true,  lum:60, tint:"Chaude", room:23.5, towel:true, floor:true, vmc:"Auto",  bath:39.5, level:"Plein"},
+  {shower:38, flow:"Éco",    dur:8,  seat:35, bidet:36, jet:"Douce",   lidAuto:true, deo:false, night:true,  tap:36, defog:true, mirrorInfo:false, lum:70, tint:"Neutre", room:23,   towel:true, floor:true, vmc:"Lente", bath:37.5, level:"2/3"}
+];
+const GUEST = {shower:38, flow:"Normal", dur:8, seat:32, bidet:36, jet:"Douce", lidAuto:false, deo:true, night:false, tap:37, defog:true, mirrorInfo:false, lum:75, tint:"Neutre", music:"Silence", room:21.5, towel:false, floor:false, vmc:"Auto", bath:37, level:"2/3"};
+const NAMED = {"zoe":0,"zoé":0,"clara":1,"carla":2};
+const EMPTY_WORDS = /^(vide|rien|personne|aucun|fond|background|empty|nobody|none|pi[eè]ce vide|no one)$/i;
+const GUEST_WORDS = /^(invit[ée]|inconnu|guest|unknown|autre|other)$/i;
+
+const $ = id => document.getElementById(id);
+const fmt = n => Number(n).toFixed(1).replace(".", ",");
+const pick = o => Object.fromEntries(KEYS.map(k => [k, o[k]]));
+
+/* store : { classes: {label:{role,name,child,settings}}, thr } — tout reste dans le navigateur */
+let store = {classes:{}, thr:85};
+try { store = Object.assign(store, JSON.parse(localStorage.getItem("maison.store") || "{}")); } catch(e){}
+const save = () => { try { localStorage.setItem("maison.store", JSON.stringify(store)); } catch(e){} };
+
+let current = null;           // label de la classe reconnue, "__guest" ou null
+let s = {...GUEST};
+let showerOn = false, showerEnd = 0, showerTick = null, bathState = "Vide";
+
+/* ---------- Journal ---------- */
+let logItems = [];
+try { logItems = JSON.parse(localStorage.getItem("maison.log") || "[]"); } catch(e){}
+function drawLog(){
+  const ol = $("log"); ol.innerHTML = "";
+  logItems.forEach(([t,msg]) => {
+    const li = document.createElement("li"), tm = document.createElement("time"), sp = document.createElement("span");
+    const d = new Date(t);
+    tm.textContent = (d.toDateString() === new Date().toDateString() ? "" : d.toLocaleDateString("fr-FR",{day:"2-digit",month:"2-digit"}) + " ") + d.toTimeString().slice(0,8);
+    sp.textContent = msg; li.append(tm, sp); ol.appendChild(li);
+  });
+}
+function log(msg){
+  logItems.unshift([Date.now(), msg]); logItems = logItems.slice(0, 80);
+  try { localStorage.setItem("maison.log", JSON.stringify(logItems)); } catch(e){}
+  drawLog();
+}
+$("clearLog").onclick = () => { logItems = []; try { localStorage.removeItem("maison.log"); } catch(e){} drawLog(); };
+
+/* ---------- Mémorisation par personne ---------- */
+let saveTimer = null;
+function remember(){
+  if (!current || current === "__guest" || !store.classes[current]) return;
+  store.classes[current].settings = pick(s); save();
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => log(`Réglages de ${store.classes[current].name} mémorisés`), 1200);
+}
+
+/* ---------- Commandes ---------- */
+function bindRange(id, key, unit){
+  const r = $(id);
+  r.oninput = () => {
+    s[key] = +r.value;
+    if (key === "shower" && s.child && s.shower > 40){ s.shower = 40; r.value = 40; }
+    render();
+  };
+  r.onchange = () => { log(`${r.getAttribute("aria-label")} : ${unit === " %" || unit === " min" ? s[key] : fmt(s[key])}${unit}`); remember(); };
+}
+const SEG_NAMES = {flow:"Débit douche", jet:"Pression du jet", tint:"Teinte", vmc:"VMC", level:"Niveau du bain"};
+function bindSeg(key){ $(key).querySelectorAll("button").forEach(b => b.onclick = () => { s[key] = b.dataset.v; render(); log(`${SEG_NAMES[key]} : ${b.dataset.v}`); remember(); }); }
+function bindSwitch(key, label){ $(key).onclick = () => { s[key] = !s[key]; render(); log(`${label} ${s[key] ? "activé" : "désactivé"}`); remember(); }; }
+
+bindRange("showerR","shower"," °C"); bindRange("durR","dur"," min");
+bindRange("seatR","seat"," °C");     bindRange("bidetR","bidet"," °C");
+bindRange("tapR","tap"," °C");       bindRange("lumR","lum"," %");
+bindRange("roomR","room"," °C");     bindRange("bathR","bath"," °C");
+Object.keys(SEG_NAMES).forEach(bindSeg);
+bindSwitch("lidAuto","Ouverture auto de l'abattant"); bindSwitch("deo","Désodorisant");
+bindSwitch("night","Veilleuse"); bindSwitch("defog","Anti-buée"); bindSwitch("mirrorInfo","Affichage miroir");
+bindSwitch("towel","Sèche-serviettes"); bindSwitch("floor","Sol chauffant");
+
+function render(){
+  $("showerT").textContent = fmt(s.shower); $("showerR").value = s.shower;
+  $("showerMark").style.left = ((s.shower-30)/15*100) + "%";
+  const w = $("showerWarn");
+  w.hidden = !(s.shower > 42 || (s.child && s.shower >= 40));
+  w.textContent = s.child ? "Profil enfant : la douche est bloquée à 40 °C maximum." : "Au-dessus de 42 °C : risque de brûlure.";
+  $("durV").textContent = s.dur + " min"; $("durR").value = s.dur;
+  $("seatV").textContent = fmt(s.seat) + " °C"; $("seatR").value = s.seat;
+  $("bidetV").textContent = fmt(s.bidet) + " °C"; $("bidetR").value = s.bidet;
+  $("tapV").textContent = fmt(s.tap) + " °C"; $("tapR").value = s.tap;
+  $("lumV").textContent = s.lum + " %"; $("lumR").value = s.lum;
+  $("roomV").textContent = fmt(s.room) + " °C"; $("roomR").value = s.room;
+  $("bathV").textContent = fmt(s.bath) + " °C"; $("bathR").value = s.bath;
+  $("musicV").textContent = s.music;
+  $("lightPill").textContent = s.lum > 0 ? "Allumé" : "Éteint";
+  $("heatPill").textContent = "Consigne " + fmt(s.room) + " °C";
+  const open = !!(current && s.lidAuto);
+  $("lidPill").textContent = open ? "Abattant ouvert" : "Abattant fermé"; $("lidPill").classList.toggle("on", open);
+  $("showerPill").textContent = showerOn ? "En cours" : "Arrêt"; $("showerPill").classList.toggle("on", showerOn);
+  $("showerBtn").textContent = showerOn ? "Arrêter la douche" : "Lancer la douche";
+  $("bathPill").textContent = bathState; $("bathPill").classList.toggle("on", bathState !== "Vide");
+  Object.keys(SEG_NAMES).forEach(k => $(k).querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === s[k])));
+  ["lidAuto","deo","night","defog","mirrorInfo","towel","floor"].forEach(k => $(k).setAttribute("aria-checked", !!s[k]));
+}
+
+/* ---------- Classes du modèle ---------- */
+let model = null, labels = [];
+
+function setupClasses(){
+  let personIdx = 0;
+  labels.forEach(l => {
+    if (store.classes[l]) { if (store.classes[l].role === "person") personIdx++; return; }
+    const low = l.trim().toLowerCase();
+    let role = "person";
+    if (EMPTY_WORDS.test(low)) role = "none"; else if (GUEST_WORDS.test(low)) role = "guest";
+    const preset = PRESETS[NAMED[low] ?? personIdx] || PRESETS[personIdx % PRESETS.length];
+    const name = /^class\s*\d+$/i.test(l) ? `Personne ${personIdx + 1}` : l.trim();
+    store.classes[l] = {role, name, child:false, settings:{...preset, music:`Playlist de ${name}`}};
+    if (role === "person") personIdx++;
+  });
+  save(); renderMap();
+}
+
+function renderMap(){
+  const box = $("mapRows"); box.innerHTML = "";
+  labels.forEach((l, i) => {
+    const c = store.classes[l];
+    const row = document.createElement("div"); row.className = "maprow";
+    const lab = document.createElement("span"); lab.className = "val"; lab.textContent = l; lab.title = "Classe du modèle";
+    const sel = document.createElement("select"); sel.setAttribute("aria-label", `Rôle de la classe ${l}`);
+    [["person","Personne"],["guest","Invité"],["none","Pièce vide"]].forEach(([v,t]) => { const o = document.createElement("option"); o.value = v; o.textContent = t; sel.appendChild(o); });
+    sel.value = c.role;
+    const name = document.createElement("input"); name.type = "text"; name.placeholder = "Prénom"; name.value = c.name; name.setAttribute("aria-label", `Prénom pour ${l}`);
+    const kid = document.createElement("label"); kid.className = "kid";
+    const kc = document.createElement("input"); kc.type = "checkbox"; kc.checked = !!c.child;
+    kid.append(kc, document.createTextNode("Enfant"));
+    const sync = () => { const p = c.role === "person"; name.disabled = !p; kc.disabled = !p; };
+    sel.onchange = () => { c.role = sel.value; sync(); save(); };
+    name.oninput = () => { c.name = name.value.trim() || l; save(); if (current === l) $("whoName").textContent = `Bonjour ${c.name}`; };
+    kc.onchange = () => { c.child = kc.checked; save(); if (current === l){ s.child = c.child; if (s.child && s.shower > 40) s.shower = 40; render(); } };
+    sync(); row.append(lab, sel, name, kid); box.appendChild(row);
+  });
+}
+
+$("thrR").value = store.thr; $("thrV").textContent = store.thr + " %";
+$("thrR").oninput = () => { store.thr = +$("thrR").value; $("thrV").textContent = store.thr + " %"; save(); };
+
+async function loadOnline(){
+  setStatus("Chargement du modèle de reconnaissance…");
+  if (!window.tmImage){ setStatus("Impossible de charger la bibliothèque de reconnaissance. Vérifie ta connexion puis recharge la page.", true); return; }
+  try {
+    const m = await tmImage.load(MODEL_URL + "model.json", MODEL_URL + "metadata.json");
+    onModel(m, "en ligne");
+  } catch(err){
+    console.error(err);
+    setStatus("Le modèle en ligne n'a pas pu être chargé. Vérifie ta connexion, ou charge les fichiers du modèle dans « Personnes du modèle ».", true);
+    $("setup").open = true;
+  }
+}
+function onModel(m, how){
+  model = m; labels = m.getClassLabels();
+  $("tmStatus").textContent = `Modèle ${how} · ${labels.length} classes : ${labels.join(", ")}`;
+  setupClasses();
+  $("camBtn").disabled = false; $("photoBtn").hidden = false;
+  setStatus(`Modèle prêt (${labels.length} classes). Active la caméra et place-toi devant le miroir.`);
+  log(`Modèle Teachable Machine ${how} : ${labels.join(", ")}`);
+}
+$("reloadModel").onclick = () => { stopCam(); loadOnline(); };
+
+$("tmFiles").onchange = async e => {
+  const fs = [...e.target.files];
+  const md = fs.find(f => /metadata.*\.json$/i.test(f.name));
+  const mj = fs.find(f => /\.json$/i.test(f.name) && f !== md);
+  const wb = fs.find(f => /\.bin$/i.test(f.name));
+  e.target.value = "";
+  if (!mj || !wb || !md){ $("tmStatus").textContent = "Il manque un fichier : sélectionne ensemble model.json, weights.bin et metadata.json."; return; }
+  try { stopCam(); onModel(await tmImage.loadFromFiles(mj, wb, md), "local"); }
+  catch(err){ $("tmStatus").textContent = "Ce modèle n'a pas pu être lu. Il faut l'export « Tensorflow.js » de Teachable Machine."; }
+};
+
+/* ---------- Caméra et reconnaissance en direct ---------- */
+const video = $("video"), still = $("still");
+const crop = document.createElement("canvas"); crop.width = crop.height = 224;
+const cctx = crop.getContext("2d");
+let stream = null, running = false, lastT = 0, busy = false;
+let streak = {label:null, n:0}, unsureSince = null;
+
+function setStatus(t, err){ $("status").textContent = t; $("status").classList.toggle("err", !!err); }
+function setRing(p){ $("ring").style.setProperty("--p", Math.max(0, Math.min(1, p))); }
+
+async function startCam(){
+  if (!model) return;
+  if (!navigator.mediaDevices?.getUserMedia){ setStatus("Ce navigateur ne donne pas accès à la caméra. Utilise « Analyser une photo ».", true); return; }
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:"user", width:{ideal:640}, height:{ideal:640}}, audio:false});
+  } catch(err){
+    setStatus(err.name === "NotAllowedError" ? "Accès à la caméra refusé. Autorise-le dans les réglages du navigateur." : "Caméra indisponible.", true);
+    return;
+  }
+  video.srcObject = stream; video.hidden = false; still.hidden = true; $("camImg").hidden = true;
+  await video.play().catch(() => {});
+  const cam = $("cam"); cam.classList.add("live","scanning"); cam.classList.remove("found","has-img");
+  current = null; streak = {label:null, n:0}; unsureSince = null; setRing(0);
+  $("whoName").textContent = "Identification…";
+  setStatus("Regarde le miroir, je t'analyse…");
+  $("camBtn").textContent = "Arrêter la caméra";
+  running = true; requestAnimationFrame(loop);
+}
+
+function stopCam(keepFrame){
+  running = false;
+  if (keepFrame && video.videoWidth){ drawCrop(still.getContext("2d"), video, video.videoWidth, video.videoHeight); still.hidden = false; }
+  if (stream){ stream.getTracks().forEach(t => t.stop()); stream = null; }
+  video.hidden = true; video.srcObject = null;
+  const cam = $("cam"); cam.classList.remove("scanning"); if (!keepFrame) cam.classList.remove("live");
+  setRing(0);
+  $("camBtn").textContent = current ? "Scanner quelqu'un d'autre" : "Activer la caméra";
+}
+
+function drawCrop(ctx, src, w, h){
+  const side = Math.min(w, h);
+  ctx.drawImage(src, (w-side)/2, (h-side)/2, side, side, 0, 0, 224, 224);
+}
+
+async function loop(t){
+  if (!running) return;
+  requestAnimationFrame(loop);
+  if (busy || t - lastT < 1000/FPS || !video.videoWidth) return;
+  lastT = t; busy = true;
+  try {
+    drawCrop(cctx, video, video.videoWidth, video.videoHeight);
+    const preds = await model.predict(crop);
+    if (running) decide(preds);
+  } catch(err){ console.error(err); }
+  busy = false;
+}
+
+function decide(preds){
+  preds = [...preds].sort((a,b) => b.probability - a.probability);
+  drawProbs(preds);
+  const top = preds[0], c = store.classes[top.className] || {role:"guest"};
+  const thr = store.thr / 100;
+  if (c.role === "none" && top.probability >= thr){
+    streak = {label:null, n:0}; unsureSince = null; setRing(0);
+    $("whoName").textContent = "Personne devant le miroir"; setStatus("En attente… approche-toi du miroir.");
+    return;
+  }
+  if (top.probability >= thr){
+    unsureSince = null;
+    streak = streak.label === top.className ? {label:top.className, n:streak.n+1} : {label:top.className, n:1};
+    setRing(streak.n / STREAK);
+    const nm = c.role === "person" ? c.name : "un invité";
+    setStatus(`Je crois reconnaître ${nm}… ${Math.round(top.probability*100)} %`);
+    if (streak.n >= STREAK) recognize(c.role === "person" ? top.className : "__guest", top.probability);
+  } else {
+    streak = {label:null, n:0}; setRing(0);
+    unsureSince ??= performance.now();
+    setStatus("Visage pas encore reconnu, reste face au miroir…");
+    if (performance.now() - unsureSince > GUEST_AFTER) recognize("__guest", top.probability);
+  }
+}
+
+function drawProbs(preds){
+  const box = $("probs"); box.innerHTML = "";
+  preds.forEach((p, i) => {
+    const c = store.classes[p.className];
+    const r = document.createElement("div"); r.className = "prob" + (i === 0 ? " top" : "");
+    const pct = Math.round(p.probability * 100);
+    const n = document.createElement("span"); n.textContent = c && c.role === "person" ? c.name : c && c.role === "none" ? "Pièce vide" : p.className;
+    const bar = document.createElement("span"); bar.className = "bar"; const b = document.createElement("b"); b.style.width = pct + "%"; bar.appendChild(b);
+    const v = document.createElement("span"); v.textContent = pct + " %";
+    r.append(n, bar, v); box.appendChild(r);
+  });
+}
+
+function recognize(key, prob){
+  const conf = `confiance ${Math.round(prob*100)} %`;
+  current = key;
+  if (key === "__guest"){
+    s = {...GUEST};
+    $("whoName").textContent = "Bienvenue, invité";
+    setStatus(`Visage non reconnu (${conf}) : réglages invité appliqués.`);
+    log(`Visage non reconnu (${conf}) → profil invité`);
+  } else {
+    const c = store.classes[key];
+    s = {...GUEST, ...c.settings, child: !!c.child};
+    if (s.child && s.shower > 40) s.shower = 40;
+    $("whoName").textContent = `Bonjour ${c.name}`;
+    setStatus(`Reconnu·e (${conf}). Tes réglages sont appliqués.`);
+    log(`${c.name} reconnu·e (${conf}) → profil appliqué`);
+  }
+  log(`Douche ${fmt(s.shower)} °C · siège ${fmt(s.seat)} °C · pièce ${fmt(s.room)} °C`);
+  if (s.lidAuto) log("Abattant de la cuvette ouvert automatiquement");
+  if (navigator.vibrate) navigator.vibrate(60);
+  $("cam").classList.add("found");
+  stopCam(true);
+  render();
+}
+
+$("camBtn").onclick = () => { running ? (stopCam(), setStatus("Caméra arrêtée.")) : startCam(); };
+document.addEventListener("visibilitychange", () => { if (document.hidden && running){ stopCam(); setStatus("Caméra mise en pause."); } });
+
+/* Analyse d'une photo (secours si la caméra en direct n'est pas disponible) */
+$("photo").onchange = e => {
+  const f = e.target.files[0]; e.target.value = "";
+  if (!f || !model) return;
+  stopCam();
+  const img = $("camImg");
+  img.onload = async () => {
+    const cam = $("cam"); cam.classList.add("has-img","scanning"); cam.classList.remove("found"); img.hidden = false; still.hidden = true;
+    setStatus("Analyse de la photo…");
+    try {
+      drawCrop(cctx, img, img.naturalWidth, img.naturalHeight);
+      const preds = [...await model.predict(crop)].sort((a,b) => b.probability - a.probability);
+      drawProbs(preds);
+      const top = preds[0], c = store.classes[top.className] || {role:"guest"};
+      cam.classList.remove("scanning");
+      if (c.role === "none"){ $("whoName").textContent = "Personne détectée"; setStatus("Aucun visage sur la photo."); return; }
+      recognize(top.probability >= store.thr/100 && c.role === "person" ? top.className : "__guest", top.probability);
+    } catch(err){ cam.classList.remove("scanning"); setStatus("L'analyse de la photo a échoué. Essaie une autre photo.", true); }
+    URL.revokeObjectURL(img.src);
+  };
+  img.src = URL.createObjectURL(f);
+};
+
+/* ---------- Équipements ---------- */
+$("showerBtn").onclick = () => {
+  if (!current){ log("Douche refusée : aucun visage reconnu"); setStatus("Fais-toi reconnaître avant de lancer la douche."); return; }
+  showerOn = !showerOn;
+  clearInterval(showerTick);
+  if (showerOn){
+    showerEnd = Date.now() + s.dur * 60000;
+    log(`Douche lancée à ${fmt(s.shower)} °C, débit ${s.flow}, arrêt auto après ${s.dur} min`);
+    const tick = () => {
+      const left = Math.max(0, showerEnd - Date.now());
+      $("showerTimer").hidden = false;
+      $("showerTimer").textContent = `Arrêt automatique dans ${Math.floor(left/60000)} min ${String(Math.floor(left/1000)%60).padStart(2,"0")} s`;
+      if (!left){ showerOn = false; clearInterval(showerTick); $("showerTimer").hidden = true; log("Douche arrêtée automatiquement (durée max atteinte)"); render(); }
+    };
+    tick(); showerTick = setInterval(tick, 1000);
+  } else { $("showerTimer").hidden = true; log("Douche arrêtée"); }
+  render();
+};
+$("flushBtn").onclick = () => log("Chasse d'eau déclenchée" + (s.deo ? " · désodorisant 30 s" : ""));
+$("bathBtn").onclick = () => {
+  if (bathState === "Remplissage") return;
+  bathState = "Remplissage"; render(); log(`Remplissage du bain : ${fmt(s.bath)} °C, niveau ${s.level}`);
+  setTimeout(() => { bathState = "Prêt"; render(); log("Bain prêt"); }, 3000);
+};
+
+function tick(){ $("clock").textContent = new Date().toLocaleString("fr-FR",{weekday:"long", hour:"2-digit", minute:"2-digit"}); }
+tick(); setInterval(tick, 30000);
+drawLog(); render();
+log("Système prêt · 6 équipements connectés (simulation)");
+loadOnline();
+
+if ("serviceWorker" in navigator){ addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {})); }
+</script>
+</body>
+</html>
