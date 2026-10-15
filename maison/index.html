@@ -276,6 +276,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
   </section>
 
   <p class="note">La reconnaissance se fait entièrement sur ton téléphone avec ton modèle Teachable Machine : aucune image n'est envoyée sur internet. Les équipements sont simulés ; pour piloter une vraie salle de bain, il faut relier cette appli à des appareils connectés (mitigeur thermostatique, WC lavant, éclairage, thermostat) via une box domotique comme Home Assistant.</p>
+  <p class="note" id="ver">Version 5</p>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
@@ -532,18 +533,27 @@ function renderMap(){
 $("thrR").value = store.thr; $("thrV").textContent = store.thr + " %";
 $("thrR").oninput = () => { store.thr = +$("thrR").value; $("thrV").textContent = store.thr + " %"; save(); };
 
+let loadTry = 0, loadTimer = null;
 async function loadOnline(){
-  setStatus("Chargement du modèle de reconnaissance…");
-  if (!window.tmImage){ setStatus("Impossible de charger la bibliothèque de reconnaissance. Vérifie ta connexion puis recharge la page.", true); return; }
+  clearTimeout(loadTimer);
+  setStatus(loadTry ? `Nouvel essai de chargement du modèle (${loadTry + 1})…` : "Chargement du modèle de reconnaissance…");
+  if (!window.tmImage || !window.tf){ setStatus("Impossible de charger la bibliothèque de reconnaissance. Vérifie ta connexion puis recharge la page.", true); return; }
   try {
     const m = await tmImage.load(MODEL_URL + "model.json", MODEL_URL + "metadata.json");
-    onModel(m, "en ligne");
+    loadTry = 0; onModel(m, "en ligne");
   } catch(err){
     console.error(err);
-    setStatus("Le modèle en ligne n'a pas pu être chargé. Vérifie ta connexion, ou charge les fichiers du modèle dans « Personnes du modèle ».", true);
-    $("setup").open = true;
+    loadTry++;
+    const why = (err && err.message || String(err)).slice(0, 140);
+    if (loadTry < 4){ // la connexion de l'iPad peut mettre quelques secondes à revenir
+      setStatus(`Le modèle n'a pas pu être chargé (${why}). Nouvel essai dans ${loadTry * 3} s…`, true);
+      loadTimer = setTimeout(loadOnline, loadTry * 3000);
+    } else {
+      setStatus(`Le modèle en ligne n'a pas pu être chargé (${why}). Vérifie ta connexion : je réessaierai dès qu'elle revient.`, true);
+    }
   }
 }
+addEventListener("online", () => { if (!window.tmImage) location.reload(); else if (!model){ loadTry = 0; loadOnline(); } });
 function onModel(m, how){
   model = m; labels = m.getClassLabels(); checked = false; prepModel();
   $("tmStatus").textContent = `Modèle ${how} · ${labels.length} classes : ${labels.join(", ")}`;
@@ -552,7 +562,7 @@ function onModel(m, how){
   setStatus(`Modèle prêt (${labels.length} classes). Active la caméra et place-toi devant le miroir.`);
   log(`Modèle Teachable Machine ${how} : ${labels.join(", ")}`);
 }
-$("reloadModel").onclick = () => { stopCam(); loadOnline(); };
+$("reloadModel").onclick = () => { stopCam(); loadTry = 0; loadOnline(); };
 
 $("tmFiles").onchange = async e => {
   const fs = [...e.target.files];
