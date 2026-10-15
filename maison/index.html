@@ -461,7 +461,8 @@ function setStatus(t, err){ $("status").textContent = t; $("status").classList.t
 function setRing(p){ $("ring").style.setProperty("--p", Math.max(0, Math.min(1, p))); }
 
 async function startCam(){
-  if (!model) return;
+  if (!model || running) return;
+  if (stream){ stream.getTracks().forEach(t => t.stop()); stream = null; }
   if (!navigator.mediaDevices?.getUserMedia){ setStatus("Ce navigateur ne donne pas accès à la caméra. Utilise « Analyser une photo ».", true); return; }
   try {
     stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:"user", width:{ideal:640}, height:{ideal:640}}, audio:false});
@@ -470,7 +471,9 @@ async function startCam(){
     return;
   }
   video.srcObject = stream; video.hidden = false; still.hidden = true; $("camImg").hidden = true;
-  await video.play().catch(() => {});
+  // Sur iPhone/iPad, play() peut ne jamais rendre la main : on ne l'attend pas,
+  // la boucle d'analyse attend d'elle-même que l'image arrive.
+  try { const pr = video.play(); if (pr && pr.catch) pr.catch(() => {}); } catch(e){}
   const cam = $("cam"); cam.classList.add("live","scanning"); cam.classList.remove("found","has-img");
   current = null; streak = {label:null, n:0}; unsureSince = null; setRing(0);
   $("whoName").textContent = "Identification…";
@@ -503,7 +506,7 @@ async function loop(t){
     drawCrop(cctx, video, video.videoWidth, video.videoHeight);
     const preds = await model.predict(crop);
     if (running) decide(preds);
-  } catch(err){ console.error(err); }
+  } catch(err){ console.error(err); setStatus("Erreur d'analyse : " + (err && err.message || err), true); }
   busy = false;
 }
 

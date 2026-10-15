@@ -1,5 +1,5 @@
 /* Maison Reconnue — service worker : fonctionne hors connexion (modèle et bibliothèques compris) */
-const VERSION = "maison-v1";
+const VERSION = "maison-v2";
 const CORE = [
   "./",
   "./index.html",
