@@ -94,9 +94,16 @@ label.act,label.primary{cursor:pointer;display:inline-block}
 details.setup{border-top:1px solid var(--line);padding-top:10px;text-align:left;width:100%}
 details.setup summary{cursor:pointer;font-weight:600;font-size:14px}
 .setup-body{display:flex;flex-direction:column;gap:12px;margin-top:12px}
-.maprow{display:grid;grid-template-columns:minmax(70px,auto) 1fr 1fr auto;gap:6px;align-items:center}
+.maprow{display:grid;grid-template-columns:minmax(70px,auto) 1fr 1fr auto;gap:6px;align-items:center;padding-bottom:8px;border-bottom:1px dashed var(--line)}
 @media (max-width:480px){.maprow{grid-template-columns:1fr 1fr}.maprow .val{grid-column:1/-1}}
 .maprow .val{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fix{display:flex;flex-direction:column;gap:6px;width:100%}
+.fix .people{display:flex;gap:6px;flex-wrap:wrap}
+@media (max-width:640px){.fix .people{justify-content:center}}
+.chip{border:1px solid var(--line);background:var(--sunk);color:var(--fg);border-radius:999px;padding:6px 12px;font-size:13px}
+.chip:hover{border-color:var(--accent)}
+.memline{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px;color:var(--muted);font-family:var(--mono)}
+.memline .act{padding:5px 10px;font-size:12px;font-family:var(--body)}
 .kid{display:flex;align-items:center;gap:4px;font-size:12px;color:var(--muted);white-space:nowrap}
 select,input[type=text]{font:inherit;font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--sunk);color:var(--fg);min-width:0;width:100%}
 
@@ -168,12 +175,17 @@ input[type=range]{width:100%;accent-color:var(--accent)}
         <label class="act" for="photo" id="photoBtn" hidden>Analyser une photo</label>
         <input type="file" id="photo" accept="image/*" capture="user" class="vh">
       </div>
+      <div id="fix" class="fix" hidden>
+        <span class="label">Ce n'est pas la bonne personne ? C'est…</span>
+        <div class="people" id="fixPeople"></div>
+      </div>
       <div id="probs" class="probs" aria-live="off"></div>
 
       <details class="setup" id="setup">
         <summary>Personnes du modèle</summary>
         <div class="setup-body">
           <div class="status" id="tmStatus">—</div>
+          <div class="note">L'appli apprend en continu : chaque fois qu'elle reconnaît quelqu'un, elle garde quelques images de son visage, et chaque correction (« Ce n'est pas la bonne personne ») lui apprend à ne plus se tromper. Pour aller plus vite, appuie sur « Apprendre son visage » et laisse la personne bouger un peu la tête devant la caméra pendant 4 secondes.</div>
           <div class="note">Associe chaque classe de ton modèle Teachable Machine à une personne (avec son prénom), à « Invité » ou à « Pièce vide ». Les réglages que tu changes pendant que quelqu'un est reconnu sont mémorisés pour cette personne.</div>
           <div id="mapRows" style="display:flex;flex-direction:column;gap:8px"></div>
           <div>
@@ -184,6 +196,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
             <label class="act" for="tmFiles">Charger un autre modèle (3 fichiers)</label>
             <input type="file" id="tmFiles" multiple accept=".json,.bin,application/json,application/octet-stream" class="vh">
             <button class="act" id="reloadModel">Recharger le modèle en ligne</button>
+            <button class="act" id="forget">Oublier tout l'apprentissage</button>
           </div>
         </div>
       </details>
@@ -375,6 +388,103 @@ function render(){
   ["lidAuto","deo","night","defog","mirrorInfo","towel","floor"].forEach(k => $(k).setAttribute("aria-checked", !!s[k]));
 }
 
+/* ---------- Apprentissage continu ----------
+   Le modèle Teachable Machine = un extracteur d'empreintes (MobileNet) + un petit classifieur.
+   On garde sur l'appareil des empreintes de chaque personne (images reconnues ou corrigées),
+   et on les compare à l'image en cours (plus proches voisins). Plus il y a d'exemples,
+   plus cet avis compte face à celui du modèle d'origine. */
+const MEM_MAX = 60;           // empreintes gardées par classe
+const LEARN_FRAMES = 24;      // images prises par « Apprendre son visage »
+let mem = {};                 // label -> [Float32Array normalisés]
+let featModel = null, headLayers = null;
+
+function packVec(v){ let m = 1e-9; for (const x of v) m = Math.max(m, Math.abs(x));
+  const q = new Int8Array(v.length); for (let i=0;i<v.length;i++) q[i] = Math.round(v[i]/m*127);
+  let s = ""; const u = new Uint8Array(q.buffer); for (let i=0;i<u.length;i+=8192) s += String.fromCharCode.apply(null, u.subarray(i,i+8192));
+  return btoa(s); }
+function unpackVec(b){ const s = atob(b), q = new Int8Array(s.length); for (let i=0;i<s.length;i++) q[i] = (s.charCodeAt(i) << 24) >> 24;
+  const v = new Float32Array(q.length); let n = 0; for (let i=0;i<q.length;i++){ v[i] = q[i]; n += q[i]*q[i]; }
+  n = Math.sqrt(n) || 1; for (let i=0;i<v.length;i++) v[i] /= n; return v; }
+function loadMem(){
+  mem = {};
+  try { const raw = JSON.parse(localStorage.getItem("maison.mem") || "{}");
+    Object.keys(raw).forEach(l => mem[l] = raw[l].map(unpackVec)); } catch(e){ mem = {}; }
+}
+function saveMem(){
+  try { const raw = {}; Object.keys(mem).forEach(l => raw[l] = mem[l].map(packVec));
+    localStorage.setItem("maison.mem", JSON.stringify(raw)); }
+  catch(e){ // stockage plein : on allège et on réessaie
+    Object.keys(mem).forEach(l => mem[l] = mem[l].slice(-Math.ceil(MEM_MAX/2)));
+    try { const raw = {}; Object.keys(mem).forEach(l => raw[l] = mem[l].map(packVec)); localStorage.setItem("maison.mem", JSON.stringify(raw)); } catch(e2){}
+  }
+}
+function addMem(label, feats){
+  if (!feats.length || !label) return [];
+  const arr = mem[label] || (mem[label] = []);
+  arr.push(...feats);
+  if (arr.length > MEM_MAX) arr.splice(0, arr.length - MEM_MAX);
+  return feats;
+}
+function removeMem(label, feats){
+  if (!mem[label]) return;
+  mem[label] = mem[label].filter(v => !feats.includes(v));
+}
+const memCount = l => (mem[l] || []).length;
+
+function prepModel(){
+  featModel = null; headLayers = null;
+  try {
+    const L = model.model.layers;
+    const shape = L[0].outputs[0].shape;
+    if (!model.getMetadata().grayscale && L.length >= 2 && shape.length === 2 && shape[1] >= 64){ featModel = L[0]; headLayers = L.slice(1); }
+  } catch(e){ featModel = null; }
+}
+
+/* Analyse une image 224×224 : probabilités du modèle + empreinte du visage */
+let checked = false;
+async function analyse(canvas){
+  if (!featModel) return {preds: await model.predict(canvas), feat: null};
+  const out = tf.tidy(() => {
+    const x = tf.browser.fromPixels(canvas).toFloat().div(tf.scalar(127)).sub(tf.scalar(1)).expandDims(0);
+    const f = featModel.predict(x);
+    let h = f; headLayers.forEach(l => { h = l.apply(h); });
+    const flat = f.flatten();
+    return {probs: h.flatten(), feat: flat.div(flat.norm().add(tf.scalar(1e-8)))};
+  });
+  const p = Array.from(await out.probs.data()), feat = await out.feat.data();
+  out.probs.dispose(); out.feat.dispose();
+  const preds = labels.map((l, i) => ({className: l, probability: p[i]}));
+  if (!checked){ // une fois : on vérifie qu'on obtient bien la même chose que Teachable Machine
+    checked = true;
+    const ref = await model.predict(canvas);
+    if (ref.some((r, i) => Math.abs(r.probability - p[i]) > 0.02)){ featModel = null; console.warn("Empreintes désactivées : écart avec le modèle"); return {preds: ref, feat: null}; }
+  }
+  return {preds, feat: new Float32Array(feat)};
+}
+
+/* Mélange l'avis du modèle et celui des exemples appris (plus proches voisins) */
+function blend(preds, feat){
+  if (!feat) return preds;
+  const withMem = labels.filter(l => memCount(l) >= 3);
+  if (withMem.length < 2) return preds;
+  const sims = [];
+  withMem.forEach(l => mem[l].forEach(v => { let d = 0; for (let i=0;i<v.length;i++) d += v[i]*feat[i]; sims.push([d, l]); }));
+  sims.sort((a,b) => b[0] - a[0]);
+  const k = Math.min(7, sims.length), vote = {};
+  let tot = 0;
+  for (let i=0;i<k;i++){ const w = Math.exp((sims[i][0] - sims[0][0]) * 25); vote[sims[i][1]] = (vote[sims[i][1]] || 0) + w; tot += w; }
+  const n = withMem.reduce((a,l) => a + memCount(l), 0);
+  const near = Math.max(0, Math.min(1, (sims[0][0] - 0.5) / 0.3)); // loin de tout exemple connu : on se fie au modèle
+  const w = Math.min(0.75, n / (n + 20)) * near;
+  return preds.map(p => ({className: p.className, probability: (1-w)*p.probability + w*((vote[p.className] || 0)/tot)}));
+}
+
+$("forget").onclick = () => {
+  if (!confirm("Oublier tous les visages appris sur cet appareil ? Le modèle Teachable Machine, lui, ne change pas.")) return;
+  mem = {}; try { localStorage.removeItem("maison.mem"); } catch(e){}
+  log("Apprentissage effacé"); renderMap();
+};
+
 /* ---------- Classes du modèle ---------- */
 let model = null, labels = [];
 
@@ -410,7 +520,12 @@ function renderMap(){
     sel.onchange = () => { c.role = sel.value; sync(); save(); };
     name.oninput = () => { c.name = name.value.trim() || l; save(); if (current === l) $("whoName").textContent = `Bonjour ${c.name}`; };
     kc.onchange = () => { c.child = kc.checked; save(); if (current === l){ s.child = c.child; if (s.child && s.shower > 40) s.shower = 40; render(); } };
-    sync(); row.append(lab, sel, name, kid); box.appendChild(row);
+    const ml = document.createElement("div"); ml.className = "memline";
+    const mc = document.createElement("span"); mc.textContent = featModel ? `${memCount(l)} image${memCount(l) > 1 ? "s" : ""} apprise${memCount(l) > 1 ? "s" : ""}` : "Apprentissage indisponible avec ce modèle";
+    const lb = document.createElement("button"); lb.className = "act"; lb.textContent = c.role === "none" ? "Apprendre la pièce vide" : "Apprendre son visage";
+    lb.disabled = !featModel; lb.onclick = () => { $("setup").open = false; scrollTo({top:0, behavior:"smooth"}); startCam("learn", l); };
+    ml.append(mc, lb);
+    sync(); row.append(lab, sel, name, kid, ml); box.appendChild(row);
   });
 }
 
@@ -430,7 +545,7 @@ async function loadOnline(){
   }
 }
 function onModel(m, how){
-  model = m; labels = m.getClassLabels();
+  model = m; labels = m.getClassLabels(); checked = false; prepModel();
   $("tmStatus").textContent = `Modèle ${how} · ${labels.length} classes : ${labels.join(", ")}`;
   setupClasses();
   $("camBtn").disabled = false; $("photoBtn").hidden = false;
@@ -456,12 +571,15 @@ const crop = document.createElement("canvas"); crop.width = crop.height = 224;
 const cctx = crop.getContext("2d");
 let stream = null, running = false, lastT = 0, busy = false;
 let streak = {label:null, n:0}, unsureSince = null;
+let mode = "recognize", learnLabel = null, learnFeats = [];
+let recentFeats = [], lastLearned = null;  // pour corriger une erreur de reconnaissance
 
 function setStatus(t, err){ $("status").textContent = t; $("status").classList.toggle("err", !!err); }
 function setRing(p){ $("ring").style.setProperty("--p", Math.max(0, Math.min(1, p))); }
 
-async function startCam(){
+async function startCam(m, label){
   if (!model || running) return;
+  mode = m === "learn" ? "learn" : "recognize"; learnLabel = label || null; learnFeats = []; recentFeats = [];
   if (stream){ stream.getTracks().forEach(t => t.stop()); stream = null; }
   if (!navigator.mediaDevices?.getUserMedia){ setStatus("Ce navigateur ne donne pas accès à la caméra. Utilise « Analyser une photo ».", true); return; }
   try {
@@ -475,9 +593,16 @@ async function startCam(){
   // la boucle d'analyse attend d'elle-même que l'image arrive.
   try { const pr = video.play(); if (pr && pr.catch) pr.catch(() => {}); } catch(e){}
   const cam = $("cam"); cam.classList.add("live","scanning"); cam.classList.remove("found","has-img");
-  current = null; streak = {label:null, n:0}; unsureSince = null; setRing(0);
-  $("whoName").textContent = "Identification…";
-  setStatus("Regarde le miroir, je t'analyse…");
+  streak = {label:null, n:0}; unsureSince = null; setRing(0); $("fix").hidden = true;
+  if (mode === "learn"){
+    const c = store.classes[learnLabel];
+    $("whoName").textContent = c.role === "none" ? "J'apprends la pièce vide" : `J'apprends ${c.name}`;
+    setStatus(c.role === "none" ? "Sors du champ de la caméra…" : "Regarde la caméra et bouge doucement la tête…");
+  } else {
+    current = null;
+    $("whoName").textContent = "Identification…";
+    setStatus("Regarde le miroir, je t'analyse…");
+  }
   $("camBtn").textContent = "Arrêter la caméra";
   running = true; requestAnimationFrame(loop);
 }
@@ -490,6 +615,7 @@ function stopCam(keepFrame){
   const cam = $("cam"); cam.classList.remove("scanning"); if (!keepFrame) cam.classList.remove("live");
   setRing(0);
   $("camBtn").textContent = current ? "Scanner quelqu'un d'autre" : "Activer la caméra";
+  mode = "recognize";
 }
 
 function drawCrop(ctx, src, w, h, mirror){
@@ -507,8 +633,12 @@ async function loop(t){
   lastT = t; busy = true;
   try {
     drawCrop(cctx, video, video.videoWidth, video.videoHeight, true); // comme la webcam de Teachable Machine, en miroir
-    const preds = await model.predict(crop);
-    if (running) decide(preds);
+    const {preds, feat} = await analyse(crop);
+    if (running && mode === "learn") learnStep(feat);
+    else if (running){
+      if (feat){ recentFeats.push(feat); if (recentFeats.length > STREAK) recentFeats.shift(); }
+      decide(blend(preds, feat));
+    }
   } catch(err){ console.error(err); setStatus("Erreur d'analyse : " + (err && err.message || err), true); }
   busy = false;
 }
@@ -538,6 +668,19 @@ function decide(preds){
   }
 }
 
+function learnStep(feat){
+  if (!feat){ stopCam(); setStatus("Ce modèle ne permet pas l'apprentissage.", true); return; }
+  learnFeats.push(feat); setRing(learnFeats.length / LEARN_FRAMES);
+  if (learnFeats.length < LEARN_FRAMES) return;
+  const l = learnLabel, c = store.classes[l];
+  addMem(l, learnFeats.filter((_, i) => i % 2 === 0)); saveMem();
+  stopCam(); renderMap();
+  $("whoName").textContent = "C'est noté";
+  const who = c.role === "none" ? "la pièce vide" : c.name;
+  setStatus(`J'ai appris ${who} (${memCount(l)} images en mémoire).`);
+  log(`Apprentissage : ${who} · ${memCount(l)} images`);
+}
+
 function drawProbs(preds){
   const box = $("probs"); box.innerHTML = "";
   preds.forEach((p, i) => {
@@ -551,9 +694,15 @@ function drawProbs(preds){
   });
 }
 
-function recognize(key, prob){
-  const conf = `confiance ${Math.round(prob*100)} %`;
+function recognize(key, prob, how){
+  const conf = how || `confiance ${Math.round(prob*100)} %`;
   current = key;
+  // Apprentissage automatique : on garde 2 images de la personne reconnue
+  lastLearned = null;
+  if (!how && key !== "__guest" && recentFeats.length && prob >= Math.max(0.8, store.thr/100)){
+    const f = [recentFeats[0], recentFeats[recentFeats.length-1]].filter((v, i, a) => a.indexOf(v) === i);
+    lastLearned = {label: key, feats: addMem(key, f)}; saveMem();
+  }
   if (key === "__guest"){
     s = {...GUEST};
     $("whoName").textContent = "Bienvenue, invité";
@@ -572,10 +721,32 @@ function recognize(key, prob){
   if (navigator.vibrate) navigator.vibrate(60);
   $("cam").classList.add("found");
   stopCam(true);
+  showFix(key);
   render();
 }
 
-$("camBtn").onclick = () => { running ? (stopCam(), setStatus("Caméra arrêtée.")) : startCam(); };
+function showFix(key){
+  const box = $("fixPeople"); box.innerHTML = "";
+  const opts = labels.filter(l => store.classes[l].role === "person" && l !== key).map(l => [l, store.classes[l].name]);
+  if (key !== "__guest") opts.push(["__guest", "Un invité"]);
+  opts.forEach(([l, n]) => { const b = document.createElement("button"); b.className = "chip"; b.textContent = n; b.onclick = () => correct(l); box.appendChild(b); });
+  $("fix").hidden = !opts.length;
+}
+
+function correct(label){
+  const wrong = current;
+  if (lastLearned){ removeMem(lastLearned.label, lastLearned.feats); lastLearned = null; }
+  const added = label !== "__guest" && recentFeats.length ? addMem(label, recentFeats.slice(-4)) : [];
+  saveMem(); renderMap();
+  const wn = wrong === "__guest" ? "invité" : store.classes[wrong]?.name, rn = label === "__guest" ? "un invité" : store.classes[label].name;
+  log(`Correction : ce n'était pas ${wn}, c'était ${rn} · j'apprends`);
+  recentFeats = label === "__guest" ? [] : recentFeats;
+  recognize(label, 1, "corrigé à la main");
+  if (added.length) lastLearned = {label, feats: added};  // si on se corrige encore, on le retire
+  if (label !== "__guest") setStatus(`Merci ! Je retiens que c'est ${rn}. Ses réglages sont appliqués.`);
+}
+
+$("camBtn").onclick = () => { running ? (stopCam(), setStatus("Caméra arrêtée.")) : startCam("recognize"); };
 document.addEventListener("visibilitychange", () => { if (document.hidden && running){ stopCam(); setStatus("Caméra mise en pause."); } });
 
 /* Analyse d'une photo (secours si la caméra en direct n'est pas disponible) */
@@ -589,7 +760,9 @@ $("photo").onchange = e => {
     setStatus("Analyse de la photo…");
     try {
       drawCrop(cctx, img, img.naturalWidth, img.naturalHeight);
-      const preds = [...await model.predict(crop)].sort((a,b) => b.probability - a.probability);
+      const r = await analyse(crop);
+      recentFeats = r.feat ? [r.feat] : [];
+      const preds = [...blend(r.preds, r.feat)].sort((a,b) => b.probability - a.probability);
       drawProbs(preds);
       const top = preds[0], c = store.classes[top.className] || {role:"guest"};
       cam.classList.remove("scanning");
@@ -628,7 +801,7 @@ $("bathBtn").onclick = () => {
 
 function tick(){ $("clock").textContent = new Date().toLocaleString("fr-FR",{weekday:"long", hour:"2-digit", minute:"2-digit"}); }
 tick(); setInterval(tick, 30000);
-drawLog(); render();
+drawLog(); render(); loadMem();
 log("Système prêt · 6 équipements connectés (simulation)");
 loadOnline();
 

@@ -18,6 +18,7 @@ La salle de bain qui te reconnaît : la caméra frontale analyse ton visage en d
 Adresse : **https://zcabande-arch.github.io/Sport-Mimi-/maison/**
 
 - Le modèle se charge tout seul depuis Teachable Machine ; chaque classe devient une personne (prénom modifiable), « Invité » ou « Pièce vide » dans **Personnes du modèle**.
+- **Apprentissage continu** : à chaque reconnaissance, l'appli garde quelques images du visage ; le bouton « Ce n'est pas la bonne personne ? » corrige et lui apprend à ne plus se tromper ; « Apprendre son visage » (dans Personnes du modèle) enregistre 4 secondes de la personne. Tout reste sur l'appareil.
 - Les réglages changés pendant que quelqu'un est reconnu sont mémorisés pour cette personne. Option **Enfant** : douche bloquée à 40 °C.
 - Si tu ré-entraînes le modèle dans Teachable Machine, clique « Upload my model » : le lien reste le même et l'appli prend la nouvelle version.
 - Les images ne quittent jamais le téléphone. Les équipements sont simulés.
