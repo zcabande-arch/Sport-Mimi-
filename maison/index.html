@@ -492,9 +492,12 @@ function stopCam(keepFrame){
   $("camBtn").textContent = current ? "Scanner quelqu'un d'autre" : "Activer la caméra";
 }
 
-function drawCrop(ctx, src, w, h){
+function drawCrop(ctx, src, w, h, mirror){
   const side = Math.min(w, h);
+  ctx.save();
+  if (mirror){ ctx.translate(224, 0); ctx.scale(-1, 1); }
   ctx.drawImage(src, (w-side)/2, (h-side)/2, side, side, 0, 0, 224, 224);
+  ctx.restore();
 }
 
 async function loop(t){
@@ -503,7 +506,7 @@ async function loop(t){
   if (busy || t - lastT < 1000/FPS || !video.videoWidth) return;
   lastT = t; busy = true;
   try {
-    drawCrop(cctx, video, video.videoWidth, video.videoHeight);
+    drawCrop(cctx, video, video.videoWidth, video.videoHeight, true); // comme la webcam de Teachable Machine, en miroir
     const preds = await model.predict(crop);
     if (running) decide(preds);
   } catch(err){ console.error(err); setStatus("Erreur d'analyse : " + (err && err.message || err), true); }
