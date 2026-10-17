@@ -25,6 +25,20 @@ Adresse : **https://zcabande-arch.github.io/Sport-Mimi-/maison/**
 
 Après une modification de `maison/`, incrémenter `VERSION` dans `maison/sw.js`.
 
+## 📸 ZO Studio (dossier `zo/`)
+
+Le planning Instagram de ZO Studio (19 posts du 14 octobre au 14 novembre 2026) en appli :
+**https://zcabande-arch.github.io/Sport-Mimi-/zo/**
+
+- **Aujourd'hui** : le post du jour (ou celui en retard, ou le prochain) avec le compte à rebours, ses visuels, et les boutons « Enregistrer les visuels » (feuille de partage → « Enregistrer les images » dans Photos), « Copier la légende », « Instagram » et « C'est publié ».
+- **Planning** : tous les posts par semaine, filtres par thème ou « À faire », coche « Publié » directement dans la liste.
+- **Calendrier** : octobre et novembre, une pastille par post (couleur du thème, ✓ quand c'est publié, cerclé s'il est en retard).
+- Chaque post s'ouvre en grand : visuels en plein écran (balayer pour passer au suivant), légende modifiable, et pour « Ta photo » un bouton pour ajouter ta propre photo.
+- **Réglages** : « Ajouter les rappels au calendrier » (un fichier .ics, alerte 15 min avant chaque post), thème clair / sombre.
+- Les visuels sont dans `zo/img/` et les textes dans `zo/posts.js`. Tout marche hors connexion ; les coches, légendes retouchées et photos restent sur le téléphone.
+
+Après une modification de `zo/`, incrémenter `VERSION` dans `zo/sw.js` (et dans `zo/index.html`). Si tu ajoutes des images, ajoute-les aussi à la liste `IMAGES` de `zo/sw.js`.
+
 ## Mettre l'application en ligne (une seule fois)
 
 1. Sur GitHub : **Settings → Pages**.

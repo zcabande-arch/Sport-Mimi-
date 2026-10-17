@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#3b2a20"/>
+  <rect x="96" y="96" width="320" height="320" rx="92" fill="none" stroke="#f3eee6" stroke-width="20" opacity=".35"/>
+  <circle cx="364" cy="148" r="16" fill="#e7a3cb"/>
+  <text x="256" y="318" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="176" font-weight="600" fill="#f3eee6" letter-spacing="-4">ZO</text>
+</svg>

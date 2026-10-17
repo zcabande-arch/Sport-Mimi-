@@ -1,0 +1,20 @@
+{
+  "name": "ZO Studio · Planning Instagram",
+  "short_name": "ZO Studio",
+  "description": "Le planning Instagram de ZO Studio : le prochain post, ses visuels à enregistrer, la légende à copier et le suivi de ce qui est publié.",
+  "lang": "fr",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f3eee6",
+  "theme_color": "#f3eee6",
+  "categories": ["productivity", "social"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
