@@ -139,8 +139,8 @@ h2{font-size:26px;line-height:1.1}
 /* tab bar */
 .tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;background:color-mix(in srgb,var(--paper) 92%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--line);
   display:flex;justify-content:center;padding:6px max(10px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(10px,env(safe-area-inset-left,0px))}
-.tabs-in{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;width:100%;max-width:480px}
-.tab{border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 4px;border-radius:12px;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;min-height:52px}
+.tabs-in{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;width:100%;max-width:520px}
+.tab{border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;border-radius:12px;font-size:11.5px;font-weight:600;color:var(--muted);cursor:pointer;min-height:52px}
 .tab svg{width:22px;height:22px}
 .tab[aria-selected="true"]{color:var(--ink);background:var(--sunk)}
 
@@ -150,7 +150,7 @@ h2{font-size:26px;line-height:1.1}
 @keyframes up{from{transform:translateY(24px);opacity:0}to{transform:none;opacity:1}}
 @media (prefers-reduced-motion:reduce){.sheet{animation:none}}
 .sheet-in{max-width:760px;margin:0 auto}
-.sheet-top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;position:sticky;top:0;z-index:2;background:var(--bg);padding:4px 0}
+.sheet-top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;position:sticky;top:0;z-index:2;background:var(--bg);padding:4px 0;box-shadow:0 -60px 0 60px var(--bg)}
 .sheet h2{font-size:clamp(28px,7vw,36px);margin:10px 0 14px}
 .cap{margin-top:16px}
 .cap-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px}
@@ -169,6 +169,27 @@ h2{font-size:26px;line-height:1.1}
 /* toast */
 .toast{position:fixed;left:50%;bottom:calc(var(--tabbar) + 22px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:60;background:var(--ink);color:var(--paper);padding:10px 16px;border-radius:999px;font-weight:600;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.18);max-width:calc(100% - 32px);text-align:center}
 
+/* boutique */
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:18px}
+.stat{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:12px;min-width:0}
+.stat b{display:block;font-size:22px;font-variant-numeric:tabular-nums;line-height:1.2}
+.stat span{font-size:12px;color:var(--muted)}
+.listing{display:grid;grid-template-columns:92px 1fr;gap:12px}
+.listing img,.listing .noimg{width:92px;height:92px;object-fit:cover;border-radius:10px;background:var(--sunk);display:block}
+.listing h3{font-family:var(--body);font-size:15px;font-weight:600;line-height:1.3;margin:2px 0 4px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.price{font-weight:700;font-variant-numeric:tabular-nums}
+.plan-state{font-size:13px;color:var(--muted);margin-top:4px}
+.plan-state.none{color:var(--late);font-weight:600}
+.listing .actions{grid-column:1 / -1;margin-top:4px}
+.badge-new{background:var(--plum-soft);color:var(--plum)}
+.alert{display:flex;gap:12px;align-items:center;justify-content:space-between;background:var(--plum-soft);color:var(--ink);border-radius:14px;padding:12px 14px;margin-bottom:18px;border:0;width:100%;text-align:left;cursor:pointer}
+.alert b{color:var(--plum)}
+.etsy{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:14px;padding:12px 14px;border-radius:12px;background:var(--gold-soft)}
+.etsy a{color:var(--ink);font-weight:700}
+.steps{margin:8px 0 0;padding-left:20px;color:var(--muted)}
+.steps li{margin:4px 0}
+.steps code{font-size:13px;background:var(--sunk);padding:1px 5px;border-radius:5px;color:var(--ink)}
+
 /* settings */
 .settings .card{margin-bottom:12px}
 .opt{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
@@ -181,6 +202,7 @@ h2{font-size:26px;line-height:1.1}
   <section id="v-today" aria-labelledby="t-today"></section>
   <section id="v-plan" hidden aria-labelledby="t-plan"></section>
   <section id="v-cal" hidden aria-labelledby="t-cal"></section>
+  <section id="v-shop" hidden aria-labelledby="t-shop"></section>
 </main>
 
 <nav class="tabs" aria-label="Navigation"><div class="tabs-in" role="tablist">
@@ -190,6 +212,8 @@ h2{font-size:26px;line-height:1.1}
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>Planning</button>
   <button class="tab" role="tab" data-view="cal" aria-selected="false">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>Calendrier</button>
+  <button class="tab" role="tab" data-view="shop" aria-selected="false">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4zM3 6h18M16 10a4 4 0 0 1-8 0"/></svg>Boutique</button>
 </div></nav>
 
 <div class="sheet" id="sheet" hidden role="dialog" aria-modal="true" aria-label="Post"><div class="sheet-in" id="sheet-in"></div></div>
@@ -206,10 +230,12 @@ h2{font-size:26px;line-height:1.1}
 <script>
 (function(){
 "use strict";
-const VERSION = "zo-v1";
+const VERSION = "zo-v2";
 const KEY = "zo-planning-done";
 const KEY_EDIT = "zo-captions";
 const KEY_THEME = "zo-theme";
+const KEY_CUSTOM = "zo-custom-posts";       // posts ajoutés depuis la boutique
+const SHOP_URL = "https://www.etsy.com/shop/zoestudioapp";
 const MONTHS = ["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"];
 const DAYS = ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"];
 
@@ -229,12 +255,18 @@ const ICON = {
 };
 
 /* ---------- données ---------- */
-const posts = window.POSTS.map(p => {
+const base = window.POSTS.map(p => {
   const [y, m, d] = p.id.split("-").map(Number);
   const [hh, mm] = p.time.split("h").map(Number);
   return Object.assign({}, p, { at: new Date(y, m - 1, d, hh, mm || 0) });
-}).sort((a, b) => a.at - b.at);
-const byId = Object.fromEntries(posts.map(p => [p.id, p]));
+});
+let custom = load(KEY_CUSTOM, []);
+let posts = [], byId = {};
+function rebuild(){
+  posts = base.concat(custom.map(c => Object.assign({}, c, { at: new Date(c.at) }))).sort((a, b) => a.at - b.at);
+  byId = Object.fromEntries(posts.map(p => [p.id, p]));
+}
+rebuild();
 
 let done = load(KEY, {});
 let edits = load(KEY_EDIT, {});
@@ -269,6 +301,68 @@ async function putPhoto(key, blob){
 }
 const urls = {};
 const photoUrl = key => photos[key] ? (urls[key] = urls[key] || URL.createObjectURL(photos[key])) : null;
+
+/* ---------- boutique Etsy (zo/shop.json, mis à jour chaque jour par GitHub) ---------- */
+let shop = null;
+async function loadShop(){
+  try {
+    const r = await fetch("shop.json", { cache: "no-cache" });
+    if (r.ok) { shop = await r.json(); save("zo-shop", shop); }
+  } catch (e) {}
+  if (!shop) shop = load("zo-shop", null);
+}
+const norm = s => String(s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+// quels mots d'un titre d'annonce correspondent à quel produit du planning
+const PRODUCT_WORDS = {
+  "Phase Gym": ["phase gym"],
+  "Carnet d'Épargne": ["epargne"],
+  "Kit Auto-entrepreneur 2026": ["auto-entrepreneur", "auto entrepreneur", "autoentrepreneur", "micro-entreprise", "micro entreprise"],
+  "Guide Excel": ["excel"],
+  "Take Out": ["take out"]
+};
+const listingsFor = p => !shop ? [] : shop.listings.filter(l =>
+  p.listingId ? l.id === p.listingId : (PRODUCT_WORDS[p.product] || []).some(w => norm(l.title).includes(w)));
+const postsFor = l => posts.filter(p => p.listingId === l.id || (!p.listingId && (PRODUCT_WORDS[p.product] || []).some(w => norm(l.title).includes(w))));
+const shortTitle = t => t.split(/\s[|–—-]\s|\s?\|\s?|,/)[0].trim();
+const money = (v, c) => v == null ? "" : v.toLocaleString("fr-FR", { style: "currency", currency: c || "EUR" });
+const isNew = l => Date.now() - new Date(l.firstSeen) < 14 * 864e5;
+const unplanned = () => !shop ? [] : shop.listings.filter(l => !postsFor(l).some(p => !isDone(p)));
+
+function captionFor(l){
+  const name = shortTitle(l.title);
+  const desc = (l.description || "").split(/\n+/).map(x => x.trim()).filter(Boolean);
+  const intro = desc.slice(0, 2).join("\n\n").slice(0, 320);
+  const tags = l.tags.slice(0, 5).map(t => "#" + norm(t).replace(/[^a-z0-9]/g, "")).filter(t => t.length > 2);
+  return "Nouveau dans la boutique : " + name + " ✨\n\n" + (intro ? intro + "\n\n" : "") +
+    (l.price != null ? money(l.price, l.currency) + ", en téléchargement immédiat sur Etsy. " : "") + "Lien en bio.\n\n" +
+    "Enregistre ce post pour plus tard 📌 et dis-moi en commentaire si tu veux que je te montre l'intérieur 👇" +
+    (tags.length ? "\n\n" + tags.concat(["#etsyfrance", "#boutiqueetsy"]).join(" ") : "");
+}
+// premier jour libre à partir de demain : 12h30 en semaine, 10h le week-end (comme les carrousels du planning)
+function nextSlot(){
+  const taken = new Set(posts.map(p => startOfDay(p.at).getTime()));
+  const d = startOfDay(new Date()); d.setDate(d.getDate() + 1);
+  while (taken.has(d.getTime())) d.setDate(d.getDate() + 1);
+  const we = d.getDay() === 0 || d.getDay() === 6;
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate(), we ? 10 : 12, we ? 0 : 30);
+}
+function addListingPost(id){
+  const l = shop.listings.find(x => x.id === id); if (!l) return;
+  const name = shortTitle(l.title), at = nextSlot();
+  const p = {
+    id: "etsy-" + l.id + "-" + Date.now().toString(36), custom: true, listingId: l.id,
+    pillar: "Vente", format: "Carrousel", product: name, title: "Nouveau : " + name,
+    time: fmtTime(at), at: at.toISOString(),
+    how: "Les photos de ton annonce Etsy, dans l'ordre. En story le même jour : partage le post avec un sticker lien vers l'annonce.",
+    caption: captionFor(l), images: l.images.length ? l.images : [{ ph: "Photo du produit" }]
+  };
+  custom.push(p); save(KEY_CUSTOM, custom); rebuild();
+  toast("Ajouté au planning : " + fmtDay(at)); openPost(p.id);
+}
+function removeCustom(id){
+  custom = custom.filter(c => c.id !== id); save(KEY_CUSTOM, custom); rebuild();
+  toast("Retiré du planning"); closeSheets();
+}
 
 /* ---------- dates ---------- */
 const startOfDay = d => new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -334,8 +428,13 @@ function renderToday(now){
   const hello = now.getHours() < 18 ? "Bonjour Zoé" : "Bonsoir Zoé";
   let h = '<div class="top"><div><p class="label">ZO Studio · Instagram</p><h1 id="t-today">' + hello + '</h1><p class="sub">' + esc(fmtDay(now)) + '</p></div>' +
     '<button type="button" class="icon-btn" data-settings aria-label="Réglages">' + ICON.gear + '</button></div>';
-  h += '<div class="prog"><div class="prog-row"><span class="label">Planning du 14 oct au 14 nov</span><span class="prog-n">' + n + ' / ' + total + ' publiés</span></div>' +
+  const MSHORT = ["janv", "févr", "mars", "avr", "mai", "juin", "juil", "août", "sept", "oct", "nov", "déc"];
+  const first = posts[0].at, last = posts[posts.length - 1].at, sm = d => d.getDate() + " " + MSHORT[d.getMonth()];
+  h += '<div class="prog"><div class="prog-row"><span class="label">Planning du ' + sm(first) + ' au ' + sm(last) + '</span><span class="prog-n">' + n + ' / ' + total + ' publiés</span></div>' +
     '<div class="bar"><i style="width:' + (n / total * 100) + '%"></i></div></div>';
+  const todo = unplanned();
+  if (todo.length) h += '<button type="button" class="alert" data-go="shop"><span><b>' + todo.length + ' annonce' + (todo.length > 1 ? "s" : "") + ' Etsy</b> sans post prévu' +
+    (todo.some(isNew) ? ', dont des nouveautés' : '') + '</span><span aria-hidden="true">›</span></button>';
 
   // le post du jour passe en premier, puis ce qui est en retard, puis le prochain
   const hero = posts.find(p => !isDone(p) && dayDiff(p.at, now) === 0) || late[0] || next;
@@ -350,7 +449,7 @@ function renderToday(now){
       '<p class="how"><strong>Visuels :</strong> ' + esc(hero.how) + '</p>' + actions(hero) +
       '<button type="button" class="btn wide" style="margin-top:8px;width:100%" data-open="' + hero.id + '">Voir la légende et le détail</button></article>';
   } else {
-    h += '<div class="card hero"><h2>Tout est publié 🎉</h2><p class="sub">Les 19 posts du planning sont en ligne. Bravo !</p></div>';
+    h += '<div class="card hero"><h2>Tout est publié 🎉</h2><p class="sub">Tous les posts du planning sont en ligne. Bravo !</p></div>';
   }
 
   const others = late.filter(p => p !== hero);
@@ -362,7 +461,7 @@ function renderToday(now){
 
 function renderPlan(now){
   const pillars = ["Tous", "À faire"].concat([...new Set(posts.map(p => p.pillar))]);
-  let h = '<div class="top"><div><p class="label">19 posts</p><h1 id="t-plan">Planning</h1></div></div>' +
+  let h = '<div class="top"><div><p class="label">' + posts.length + ' posts</p><h1 id="t-plan">Planning</h1></div></div>' +
     '<div class="filters" role="group" aria-label="Filtrer">' + pillars.map(f => '<button type="button" class="filter" data-filter="' + esc(f) + '" aria-pressed="' + (f === filter) + '">' + esc(f) + '</button>').join("") + '</div>';
   const list = posts.filter(p => filter === "Tous" || (filter === "À faire" ? !isDone(p) : p.pillar === filter));
   if (!list.length) h += '<p class="empty">Rien ici. Tout est publié !</p>';
@@ -381,9 +480,9 @@ function renderPlan(now){
 }
 
 function renderCal(now){
-  const byDay = {}; posts.forEach(p => byDay[startOfDay(p.at).getTime()] = p);
+  const byDay = {}; posts.forEach(p => { const k = startOfDay(p.at).getTime(); if (!byDay[k] || (isDone(byDay[k]) && !isDone(p))) byDay[k] = p; });
   const months = [...new Set(posts.map(p => p.at.getFullYear() * 12 + p.at.getMonth()))];
-  let h = '<div class="top"><div><p class="label">Octobre · novembre 2026</p><h1 id="t-cal">Calendrier</h1></div></div>';
+  let h = '<div class="top"><div><p class="label">' + (months.length > 1 ? "Mois par mois" : "Ce mois-ci") + '</p><h1 id="t-cal">Calendrier</h1></div></div>';
   months.forEach(mi => {
     const y = Math.floor(mi / 12), m = mi % 12, first = new Date(y, m, 1), len = new Date(y, m + 1, 0).getDate();
     h += '<div class="month"><h2>' + MONTHS[m] + ' ' + y + '</h2><div class="grid">' +
@@ -400,6 +499,40 @@ function renderCal(now){
   $("#v-cal").innerHTML = h;
 }
 
+function renderShop(now){
+  let h = '<div class="top"><div><p class="label">Etsy · zoestudioapp</p><h1 id="t-shop">Boutique</h1>' +
+    (shop ? '<p class="sub">Mise à jour ' + esc(relDay(new Date(shop.updated), now).toLowerCase()) + ' à ' + fmtTime(new Date(shop.updated)) + '</p>' : '') + '</div></div>';
+  if (!shop) {
+    h += '<div class="card"><h2>Boutique pas encore reliée</h2><p class="sub">Dès que la clé Etsy est ajoutée sur GitHub, tes annonces arrivent ici toutes seules chaque matin. Les nouvelles annonces sans post te seront signalées, avec un post tout prêt à ajouter au planning.</p>' +
+      '<ol class="steps"><li>Sur <b>etsy.com/developers</b> : « Create a new app », puis copie la <i>Keystring</i> et le <i>Shared secret</i>.</li>' +
+      '<li>Sur GitHub, dépôt Sport-Mimi- : Settings → Secrets and variables → Actions → New repository secret : <code>ETSY_API_KEY</code> (Keystring) et <code>ETSY_SHARED_SECRET</code>.</li>' +
+      '<li>Onglet Actions → « Boutique Etsy → appli ZO Studio » → Run workflow.</li></ol>' +
+      '<div class="actions"><a class="btn wide" href="' + SHOP_URL + '" target="_blank" rel="noopener">Ouvrir ma boutique Etsy</a></div></div>';
+    $("#v-shop").innerHTML = h; return;
+  }
+  const s = shop.shop;
+  h += '<div class="stats"><div class="stat"><b>' + shop.listings.length + '</b><span>annonces</span></div>' +
+    '<div class="stat"><b>' + (s.sales ?? "–") + '</b><span>ventes</span></div>' +
+    '<div class="stat"><b>' + (s.rating ? s.rating.toFixed(1).replace(".", ",") + "★" : (s.favorites ?? "–")) + '</b><span>' + (s.rating ? (s.reviews || 0) + " avis" : "favoris") + '</span></div></div>';
+  const todo = unplanned();
+  if (todo.length) h += '<p class="label" style="margin-bottom:8px">Sans post prévu</p>';
+  const rest = shop.listings.filter(l => !todo.includes(l));
+  if (!shop.listings.length) h += '<p class="empty">Aucune annonce active pour le moment.</p>';
+  const card = l => {
+    const ps = postsFor(l).filter(p => !isDone(p)), nextP = ps.find(p => p.at >= now) || ps[0];
+    const img = l.images[0] ? '<img src="' + esc(l.images[0].src) + '" alt="" loading="lazy">' : '<span class="noimg"></span>';
+    return '<article class="card listing">' + img + '<div style="min-width:0"><div class="chips">' + (isNew(l) ? '<span class="chip badge-new">Nouveau</span>' : '') +
+      '<span class="price">' + esc(money(l.price, l.currency)) + '</span></div><h3>' + esc(l.title) + '</h3>' +
+      (ps.length ? '<p class="plan-state">' + ps.length + ' post' + (ps.length > 1 ? "s" : "") + ' à venir · prochain ' + esc(relDay(nextP.at, now).toLowerCase()) + '</p>' : '<p class="plan-state none">Aucun post prévu</p>') +
+      '</div><div class="actions">' +
+      '<button type="button" class="btn ' + (ps.length ? "" : "primary") + '" data-add="' + l.id + '">' + (ps.length ? "Ajouter un post" : "Créer le post") + '</button>' +
+      '<a class="btn" href="' + esc(l.url) + '" target="_blank" rel="noopener">Sur Etsy</a></div></article>';
+  };
+  if (todo.length) h += '<div class="list">' + todo.map(card).join("") + '</div>';
+  if (rest.length) h += '<p class="label" style="margin:22px 0 8px">Déjà dans le planning</p><div class="list">' + rest.map(card).join("") + '</div>';
+  $("#v-shop").innerHTML = h;
+}
+
 let openId = null;
 function renderSheet(now){
   const p = byId[openId]; if (!p) return;
@@ -407,10 +540,18 @@ function renderSheet(now){
     '<div data-pil="' + esc(p.pillar) + '"><div class="when"><span class="day">' + esc(fmtDay(p.at)) + '</span><span class="time">' + fmtTime(p.at) + '</span>' +
     (isDone(p) ? "" : '<span class="count' + (isLate(p, now) ? " late" : "") + '">' + countdown(p.at, now) + '</span>') + '</div>' +
     '<div class="chips" style="margin-top:8px">' + chips(p, now) + '</div><h2>' + esc(p.title) + '</h2>' + strip(p) +
-    '<p class="how"><strong>Visuels :</strong> ' + esc(p.how) + '</p>' + actions(p) +
+    '<p class="how"><strong>Visuels :</strong> ' + esc(p.how) + '</p>' + actions(p) + etsyBlock(p) +
     '<div class="cap"><div class="cap-head"><span class="label">Légende</span>' + (edits[p.id] != null ? '<button type="button" class="linkish" data-reset="' + p.id + '">Revenir au texte d\'origine</button>' : '') + '</div>' +
     '<textarea id="cap-text" data-id="' + p.id + '" aria-label="Légende">' + esc(caption(p)) + '</textarea>' +
-    '<p class="note">Tu peux retoucher la légende ici, elle est gardée sur ton téléphone.</p></div></div>';
+    '<p class="note">Tu peux retoucher la légende ici, elle est gardée sur ton téléphone.</p></div>' +
+    (p.custom ? '<div class="actions"><button type="button" class="btn wide" data-remove="' + p.id + '">Retirer ce post du planning</button></div>' : '') + '</div>';
+}
+function etsyBlock(p){
+  if (!shop || !(PRODUCT_WORDS[p.product] || p.listingId)) return "";
+  const ls = listingsFor(p);
+  if (!ls.length) return p.product === "Take Out" ? "" : '<div class="etsy"><span>Aucune annonce Etsy en ligne pour ce produit en ce moment.</span></div>';
+  const l = ls[0];
+  return '<div class="etsy"><span>Sur Etsy : <span class="price">' + esc(money(l.price, l.currency)) + '</span></span><a href="' + esc(l.url) + '" target="_blank" rel="noopener">Voir l\'annonce</a></div>';
 }
 
 function render(){
@@ -418,6 +559,7 @@ function render(){
   if (view === "today") renderToday(now);
   if (view === "plan") renderPlan(now);
   if (view === "cal") renderCal(now);
+  if (view === "shop") renderShop(now);
   if (openId && !$("#sheet").hidden && document.activeElement?.id !== "cap-text") renderSheet(now);
 }
 
@@ -498,7 +640,7 @@ function renderSettings(){
     '<div class="card"><p class="label">Apparence</p><div class="opt" role="group" aria-label="Thème">' +
     [["auto", "Automatique"], ["light", "Clair"], ["dark", "Sombre"]].map(([v, l]) => '<button type="button" class="filter" data-theme-set="' + v + '" aria-pressed="' + (t === v) + '">' + l + '</button>').join("") + '</div></div>' +
     '<div class="card"><p class="label">Installer l\'appli</p><p class="sub"><strong>iPhone :</strong> dans Safari, bouton Partager → « Sur l\'écran d\'accueil ».<br><strong>Android :</strong> dans Chrome, menu ⋮ → « Installer l\'application ».<br>Elle marche ensuite hors connexion, visuels compris.</p></div>' +
-    '<div class="card"><p class="label">Données</p><p class="sub">Les coches « Publié », tes légendes retouchées et tes photos restent sur ce téléphone.</p><div class="actions"><button type="button" class="btn wide" data-reset-all>Tout remettre à zéro</button></div></div>' +
+    '<div class="card"><p class="label">Données</p><p class="sub">Les coches « Publié », tes légendes retouchées, tes photos et les posts ajoutés depuis la boutique restent sur ce téléphone.</p><div class="actions"><button type="button" class="btn wide" data-reset-all>Tout remettre à zéro</button></div></div>' +
     '<p class="ver">ZO Studio · ' + VERSION + '</p>';
 }
 
@@ -523,7 +665,7 @@ $("#lb").addEventListener("touchend", e => { if (sx === null) return; const dx =
 function go(v){
   view = v;
   document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-selected", t.dataset.view === v));
-  ["today", "plan", "cal"].forEach(k => $("#v-" + k).hidden = k !== v);
+  ["today", "plan", "cal", "shop"].forEach(k => $("#v-" + k).hidden = k !== v);
   render(); window.scrollTo(0, 0);
   try { history.replaceState(null, "", "#" + v); } catch (e) {}
 }
@@ -559,14 +701,16 @@ document.addEventListener("click", e => {
   if (d.save) return saveVisuals(byId[d.save]);
   if (d.post) return lbOpen(byId[d.post], +d.i);
   if (d.photo) { pendingPhoto = d.photo; return $("#photo-input").click(); }
+  if (d.add) return addListingPost(+d.add);
+  if (d.remove) { if (confirm("Retirer ce post du planning ?")) removeCustom(d.remove); return; }
   if (d.filter) { filter = d.filter; return render(); }
   if (d.settings != null) { renderSettings(); $("#settings").hidden = false; document.body.style.overflow = "hidden"; try { history.pushState({ sheet: "settings" }, "", "#reglages"); } catch (err) {} return; }
   if (d.themeSet) { save(KEY_THEME, d.themeSet); applyTheme(); return renderSettings(); }
   if (d.ics != null) return exportIcs();
   if (d.reset) { delete edits[d.reset]; save(KEY_EDIT, edits); return renderSheet(new Date()); }
   if (d.resetAll != null) {
-    if (!confirm("Effacer les coches, les légendes retouchées et les photos ajoutées ?")) return;
-    done = {}; edits = {}; save(KEY, done); save(KEY_EDIT, edits);
+    if (!confirm("Effacer les coches, les légendes retouchées, les photos et les posts ajoutés ?")) return;
+    done = {}; edits = {}; custom = []; save(KEY, done); save(KEY_EDIT, edits); save(KEY_CUSTOM, custom); rebuild();
     Object.keys(photos).forEach(k => delete photos[k]);
     idb.then(db => db && db.transaction("photos", "readwrite").objectStore("photos").clear());
     toast("Tout est remis à zéro"); return closeSheets();
@@ -596,8 +740,9 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", applyThe
 /* ---------- démarrage ---------- */
 applyTheme();
 const start = (location.hash || "").slice(1);
-go(["today", "plan", "cal"].includes(start) ? start : "today");
+go(["today", "plan", "cal", "shop"].includes(start) ? start : "today");
 loadPhotos().then(render);
+loadShop().then(render);
 
 if ("serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
 })();

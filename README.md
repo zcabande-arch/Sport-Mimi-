@@ -37,6 +37,13 @@ Le planning Instagram de ZO Studio (19 posts du 14 octobre au 14 novembre 2026) 
 - **Réglages** : « Ajouter les rappels au calendrier » (un fichier .ics, alerte 15 min avant chaque post), thème clair / sombre.
 - Les visuels sont dans `zo/img/` et les textes dans `zo/posts.js`. Tout marche hors connexion ; les coches, légendes retouchées et photos restent sur le téléphone.
 
+**Boutique Etsy reliée** (onglet « Boutique ») : chaque matin, le workflow « Boutique Etsy → appli ZO Studio » (`.github/workflows/etsy.yml`) récupère les annonces actives de **zoestudioapp** avec `zo/scripts/etsy-sync.mjs` et les enregistre dans `zo/shop.json` (photos dans `zo/shop/`). L'appli montre les annonces, leur prix, combien de posts sont prévus pour chacune, signale celles qui n'ont aucun post à venir, et « Créer le post » ajoute au planning un carrousel avec les photos de l'annonce et une légende prête (au premier jour libre).
+
+Pour l'activer (une seule fois) :
+1. Sur https://www.etsy.com/developers : « Create a new app », puis noter la *Keystring* et le *Shared secret*.
+2. Sur GitHub : Settings → Secrets and variables → Actions → New repository secret : `ETSY_API_KEY` (la Keystring) et `ETSY_SHARED_SECRET`.
+3. Onglet Actions → « Boutique Etsy → appli ZO Studio » → Run workflow.
+
 Après une modification de `zo/`, incrémenter `VERSION` dans `zo/sw.js` (et dans `zo/index.html`). Si tu ajoutes des images, ajoute-les aussi à la liste `IMAGES` de `zo/sw.js`.
 
 ## Mettre l'application en ligne (une seule fois)

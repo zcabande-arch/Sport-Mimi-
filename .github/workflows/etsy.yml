@@ -1,0 +1,40 @@
+name: Boutique Etsy → appli ZO Studio
+
+on:
+  schedule:
+    - cron: "17 5 * * *"   # chaque matin (vers 7 h en France)
+  workflow_dispatch:
+  push:
+    paths:
+      - zo/scripts/etsy-sync.mjs
+      - .github/workflows/etsy.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: etsy-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Récupérer les annonces
+        env:
+          ETSY_API_KEY: ${{ secrets.ETSY_API_KEY }}
+          ETSY_SHARED_SECRET: ${{ secrets.ETSY_SHARED_SECRET }}
+          ETSY_SHOP: zoestudioapp
+        run: node zo/scripts/etsy-sync.mjs
+      - name: Enregistrer dans l'appli
+        run: |
+          git add zo/shop.json zo/shop 2>/dev/null || true
+          if git diff --cached --quiet; then echo "Rien à enregistrer."; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Boutique Etsy : annonces mises à jour"
+          git push

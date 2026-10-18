@@ -1,5 +1,5 @@
 /* ZO Studio — service worker : l'appli et tous les visuels marchent hors connexion */
-const VERSION = "zo-v1";
+const VERSION = "zo-v2";
 const EXT = "zo-ext";   // polices : gardées d'une version à l'autre
 const CORE = [
   "./",
@@ -116,6 +116,14 @@ self.addEventListener("fetch", e => {
       fetch(req)
         .then(res => { if (res.ok) { const copy = res.clone(); caches.open(VERSION).then(c => c.put("./index.html", copy)); } return res; })
         .catch(() => caches.match("./index.html").then(orError))
+    );
+    return;
+  }
+
+  // Annonces Etsy : réseau d'abord (mises à jour chaque jour), copie en secours
+  if (url.origin === self.location.origin && url.pathname.endsWith("/shop.json")) {
+    e.respondWith(
+      fetch(req).then(res => keep(VERSION, req, res)).catch(() => caches.match(req, { ignoreSearch: true }).then(orError))
     );
     return;
   }
